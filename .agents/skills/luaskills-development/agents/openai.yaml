@@ -1,4 +1,4 @@
 interface:
-  display_name: "LuaSkills 开发与发布"
-  short_description: "拉取官方调试器并闭环开发、验证和发布 LuaSkill"
-  default_prompt: "使用 $luaskills-development 开发、调试、验证并打包当前 LuaSkill。"
+  display_name: "LuaSkills Development and Release"
+  short_description: "Develop, debug, verify, package, and release LuaSkills"
+  default_prompt: "Use $luaskills-development to develop, debug, verify, and package the current LuaSkill."

@@ -119,6 +119,75 @@ def validate_layout(root: Path) -> None:
 
 
 """
+Return whether text contains a CJK Unified Ideograph used by Chinese prose.
+返回文本是否包含中文正文使用的中日韩统一表意文字。
+
+Args:
+    text: Unicode text inspected for Chinese ideographs.
+    text：接受中文表意文字检查的 Unicode 文本。
+
+Returns:
+    True when at least one CJK Unified Ideograph is present.
+    至少存在一个中日韩统一表意文字时返回真。
+"""
+def contains_han(text: str) -> bool:
+    # HanPattern covers the common and Extension A ideograph blocks used by the docs.
+    # HanPattern 覆盖文档使用的常用与扩展 A 表意文字区块。
+    han_pattern = re.compile(r"[\u3400-\u4DBF\u4E00-\u9FFF]")
+    return han_pattern.search(text) is not None
+
+
+"""
+Validate the English-default documentation and English-only AI Skill prompts.
+校验英文默认文档与全英文 AI Skill 提示词。
+
+Args:
+    root: Repository root containing user documentation and the AI Skill.
+    root：包含用户文档与 AI Skill 的仓库根目录。
+
+Returns:
+    None after every documentation-language invariant passes.
+    所有文档语言约束通过后返回空值。
+"""
+def validate_documentation(root: Path) -> None:
+    # LanguageSwitch is the exact first-line navigation shared by both README files.
+    # LanguageSwitch 是两份 README 共享的精确首行语言导航。
+    language_switch = "[English](README.md) | [简体中文](README.zh-CN.md)"
+    # EnglishReadme is the default repository documentation.
+    # EnglishReadme 是仓库默认说明文档。
+    english_readme = root / "README.md"
+    # ChineseReadme is the optional Simplified Chinese companion document.
+    # ChineseReadme 是附加的简体中文说明文档。
+    chinese_readme = root / "README.zh-CN.md"
+    require(chinese_readme.is_file(), "Missing optional-language documentation: README.zh-CN.md")
+    # EnglishText and ChineseText preserve exact line order for first-line validation.
+    # EnglishText 与 ChineseText 保留精确行序以校验首行。
+    english_text = english_readme.read_text(encoding="utf-8")
+    chinese_text = chinese_readme.read_text(encoding="utf-8")
+    require(english_text.splitlines()[0] == language_switch, "README.md must start with the language switch")
+    require(chinese_text.splitlines()[0] == language_switch, "README.zh-CN.md must start with the language switch")
+    # EnglishBody excludes the bilingual navigation label before enforcing English prose.
+    # EnglishBody 在强制英文正文前排除双语导航标签。
+    english_body = "\n".join(english_text.splitlines()[1:])
+    require(not contains_han(english_body), "README.md must use English after the language switch")
+    require(contains_han(chinese_text), "README.zh-CN.md must contain Simplified Chinese documentation")
+
+    # SkillRoot owns every prompt and reference that must remain English-only.
+    # SkillRoot 包含所有必须保持全英文的提示词与引用资料。
+    skill_root = root / ".agents" / "skills" / "luaskills-development"
+    require((skill_root / "SKILL.md").is_file(), "Missing LuaSkills AI Skill prompt")
+    # PromptPath iterates over every textual Skill prompt or UI metadata file.
+    # PromptPath 遍历每个 Skill 文本提示或 UI 元数据文件。
+    for prompt_path in sorted(skill_root.rglob("*")):
+        if not prompt_path.is_file() or prompt_path.suffix.lower() not in {".md", ".yaml", ".yml"}:
+            continue
+        # PromptText is checked independently so diagnostics identify the exact file.
+        # PromptText 独立接受检查，使诊断能够定位精确文件。
+        prompt_text = prompt_path.read_text(encoding="utf-8")
+        require(not contains_han(prompt_text), f"AI Skill prompts must be English-only: {prompt_path.relative_to(root)}")
+
+
+"""
 Validate the skill manifest and entry references.
 校验技能清单及其入口引用。
 """
@@ -231,6 +300,7 @@ def main() -> int:
     root = repo_root()
     try:
         validate_layout(root)
+        validate_documentation(root)
         validate_manifest(root)
         validate_dependencies(root)
     except Exception as error:  # noqa: BLE001

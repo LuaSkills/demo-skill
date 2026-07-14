@@ -23,6 +23,7 @@ PACKAGE_ROOT_NAMES = frozenset(
         "skill.yaml",
         "dependencies.yaml",
         "README.md",
+        "README.zh-CN.md",
         "LICENSE",
         "runtime",
         "node",

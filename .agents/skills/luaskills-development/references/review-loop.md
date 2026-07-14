@@ -1,39 +1,40 @@
-# 五轮连续审核协议
+# Five-Consecutive-Pass Review Protocol
 
-## 目标
+## Goal
 
-在真实流程测试通过后循环审核并自动修复，直到连续 5 轮没有发现任何问题。一次发现会把连续通过计数清零，修复后必须从第 1 轮重新累计。
+After the real flow test passes, review and auto-fix the repository until five consecutive complete reviews find no issues. Any finding resets the consecutive-pass counter to zero; restart from pass one after fixing and retesting.
 
-## 状态规则
+## State Rules
 
-维护两个明确计数：
+Maintain two explicit counters:
 
-- `审核轮次`：每执行一次完整审核递增。
-- `连续零问题轮次`：当前轮无问题时递增；发现任何问题时立即归零。
+- `review_iteration`: increment after every complete review.
+- `consecutive_clean_passes`: increment only when the current review finds nothing; reset to zero after any finding.
 
-只有 `连续零问题轮次 = 5` 才能结束。不得把静态工具成功等同于一轮审核；每轮都必须进行语义与调用链检查。
+Stop only when `consecutive_clean_passes = 5`. A successful static command does not constitute a review pass. Every pass must include semantic inspection and real call-path verification.
 
-## 每轮固定范围
+## Required Scope for Every Pass
 
-1. 清单与协议：核对 `skill.yaml`、`dependencies.yaml`、入口参数、帮助引用、Node/pnpm 精确版本及真实源码定义。
-2. 代码正确性：逐函数检查 Lua、JavaScript、Python、PowerShell、Shell 的参数、返回值、错误路径和双语注释。
-3. 下载安全：检查 URL 是否绑定固定 Release、checksum 是否在执行/解压前验证、临时文件是否与可执行路径隔离。
-4. 文件安全：检查递归删除目标、目录穿越、符号链接、调试暂存白名单和 Git 忽略边界。
-5. 跨平台：分别审查 Windows PowerShell 与 Linux/macOS Shell 的平台键、路径、参数和 marker。
-6. 真实调用：检查 `sync -> inspect -> list-tools -> call` 是否使用正式调试器，全部示例工具是否真实调用，Node 调用是否使用受管发行版而非系统 Node.js，并发命令是否由仓库级互斥锁串行化。
-7. 打包发布：核对 zip 顶层目录、成员白名单、checksum、Action 分支/标签语义和动态 Fork 仓库名。
-8. 文档一致性：核对 README、AI 技能、调试说明、示例命令与实际脚本参数一致。
+1. Manifest and protocol: compare `skill.yaml`, `dependencies.yaml`, entry parameters, help references, exact Node.js/pnpm versions, and authoritative upstream definitions.
+2. Code correctness: inspect parameters, returns, error paths, and bilingual code comments in Lua, JavaScript, Python, PowerShell, and Shell.
+3. Download safety: verify immutable Release URLs, checksum validation before execution or extraction, and isolation of incomplete downloads.
+4. File safety: inspect recursive deletion targets, traversal rejection, symbolic links, the debugger staging whitelist, and Git ignore boundaries.
+5. Cross-platform behavior: inspect Windows PowerShell and Linux/macOS Shell platform keys, paths, arguments, markers, encodings, and line endings.
+6. Real invocation: confirm the official `sync -> inspect -> list-tools -> call` path, invoke every example tool, use the managed Node.js distribution instead of system Node.js, and verify repository-level locking for concurrent commands.
+7. Packaging and release: verify the single zip root, exact member whitelist, checksum, Action branch/tag behavior, clean-worktree release guard, and dynamic Fork repository identity.
+8. Documentation consistency: compare the default English README, optional Chinese README, English-only AI skill prompts, debugging guide, example commands, and actual script parameters.
 
-## 发现问题后的动作
+## Action After a Finding
 
-1. 记录明确的文件、代码位置、根因和影响。
-2. 立即修复，不保留候选字段或多路径猜测。
-3. 运行与问题相关的定向测试。
-4. 重新执行完整流程测试。
-5. 将 `连续零问题轮次` 归零，并从下一轮重新累计。
+1. Record the exact file, location, root cause, and impact.
+2. Fix the issue immediately without candidate fields or speculative multi-path behavior.
+3. Run focused tests for the finding.
+4. Rerun the complete real flow.
+5. Reset `consecutive_clean_passes` to zero and restart accumulation on the next review.
 
-## 每轮通过条件
+## Pass Conditions
 
-- 本轮没有发现新问题。
-- 静态校验、技能校验、脚本语法、真实 Node 工具调用、下载幂等测试、zip/checksum 检查全部仍为成功状态。
-- `git status --short --ignored` 证明调试下载和构建产物仍被忽略，AI 技能与正式源码未被误忽略。
+- The current review finds no new issue.
+- Static validation, Skill validation, script syntax, every real tool call, managed Node.js invocation, idempotent download checks, and zip/checksum verification still pass.
+- `git status --short --ignored` proves that downloads and build outputs remain ignored while AI skill files and formal source remain visible.
+- No Chinese characters remain in `.agents/skills/luaskills-development/`; generated code may still contain the required second-line Chinese comments.
