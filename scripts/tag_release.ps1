@@ -28,13 +28,13 @@ $VerifyScript = Join-Path $PSScriptRoot "verify_skill.ps1"
 $ResolveVersionModule = "scripts.release_version"
 
 Set-Location $ProjectRoot
-# WorktreeStatus lists tracked and untracked changes that would be absent from the tag.
-# WorktreeStatus 列出不会进入标签的已跟踪与未跟踪变更。
-$WorktreeStatus = (& git status --porcelain=v1).Trim()
+# WorktreeEntries lists tracked and untracked changes that would be absent from the tag.
+# WorktreeEntries 列出不会进入标签的已跟踪与未跟踪变更。
+$WorktreeEntries = @(& git status --porcelain=v1)
 if ($LASTEXITCODE -ne 0) {
     throw "Unable to inspect the Git working tree before release."
 }
-if (-not [string]::IsNullOrWhiteSpace($WorktreeStatus)) {
+if ($WorktreeEntries.Count -gt 0) {
     throw "Release requires a clean Git working tree. Commit or remove all changes first."
 }
 
