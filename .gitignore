@@ -3,6 +3,15 @@ luac.out
 
 # Build artifacts
 dist/
+__pycache__/
+*.pyc
+node_modules/
+.pnpm-store/
+.DS_Store
+
+# Downloaded LuaSkills debug workspace
+.luaskills-debug/
+.luaskills-debug.lock*
 
 docs/plan/
 docs/completed/
@@ -12,7 +21,7 @@ dependencies/
 state/
 databases/
 temp/
-skills/
+/skills/
 bin/tools/*
 !bin/tools/.gitkeep
 lua_packages/*

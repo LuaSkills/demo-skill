@@ -1,5 +1,5 @@
 name: LuaSkills Demo Skill
-version: 0.1.3
+version: 0.2.0
 enable: true
 debug: false
 lancedb:
@@ -26,6 +26,9 @@ help:
     - name: overflow-demo
       description: Explain the paged output demo and local overflow template.
       file: help/overflow-demo.md
+    - name: node-runtime
+      description: Explain the managed Node.js runtime invocation demo.
+      file: help/node-runtime.md
 entries:
   - name: demo-status
     description: Return stable runtime diagnostics for install and lifecycle testing.
@@ -60,4 +63,18 @@ entries:
       - name: sections
         type: integer
         description: Number of repeated sections in the generated markdown.
+        required: false
+  - name: node-runtime-demo
+    description: Invoke one managed Node.js ESM handler twice and return runtime diagnostics.
+    lua_entry: runtime/node_runtime_demo.lua
+    lua_module: node_runtime_demo
+    help: node-runtime
+    parameters:
+      - name: text
+        type: string
+        description: Optional text forwarded to the managed Node.js handler.
+        required: false
+      - name: number
+        type: integer
+        description: Optional integer incremented by the managed Node.js handler.
         required: false

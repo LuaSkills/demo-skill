@@ -23,17 +23,15 @@ jobs:
       - name: Install packaging dependencies
         run: python -m pip install --upgrade pip pyyaml
 
-      - name: Validate strict skill layout
-        run: python ./scripts/validate_skill.py
-
-      - name: Build release package
-        run: python ./scripts/package_skill.py
+      - name: Run complete debugger flow
+        run: bash ./scripts/verify_skill.sh
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: demo-skill-release
+          name: ${{ github.event.repository.name }}-release
           path: dist/*
+          if-no-files-found: error
 
       - name: Publish GitHub release assets
         uses: softprops/action-gh-release@v2

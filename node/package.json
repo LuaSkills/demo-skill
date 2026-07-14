@@ -1,0 +1,9 @@
+{
+  "name": "demo-skill-managed-node",
+  "version": "0.2.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "is-odd": "3.0.1"
+  }
+}

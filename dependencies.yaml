@@ -48,5 +48,11 @@ tool_dependencies:
           - archive_path: rg
             target_path: bin/rg
             executable: true
+node_runtime:
+  version: "24.18.0"
+  package_manager: pnpm
+  package_manager_version: "11.11.0"
+  package_json: node/package.json
+  lockfile: node/pnpm-lock.yaml
 lua_dependencies: []
 ffi_dependencies: []

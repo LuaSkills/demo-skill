@@ -17,4 +17,6 @@ Available workflows:
 - `rg-dependency`
   - inspect the optional local `rg` dependency path
 - `overflow-demo`
-  - verify paged host output and skill-local overflow templates
+- verify paged host output and skill-local overflow templates
+- `node-runtime-demo`
+- invoke a pinned managed Node.js ESM handler with a pnpm-locked dependency
