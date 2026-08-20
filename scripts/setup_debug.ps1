@@ -155,14 +155,26 @@ function Get-Sha256Hash {
 function Clear-DirectoryAttributes {
     <#
     .SYNOPSIS
-    Clear read-only attributes below one verified debugger workspace path.
-    清除已校验调试工作区路径下的只读属性。
+    Clear read-only attributes below one verified debugger workspace path without following directory links.
+    清除已校验调试工作区路径下的只读属性，且不跟随目录链接。
 
     .PARAMETER Path
     Extended-length directory path whose generated contents will be normalized.
     需要标准化生成内容的扩展长度目录路径。
     #>
     param([string]$Path)
+
+    # PathAttributes identifies junctions or symbolic links that recursive cleanup must not follow.
+    # PathAttributes 标识递归清理不得跟随的联接点或符号链接。
+    $PathAttributes = [System.IO.File]::GetAttributes($Path)
+    if (($PathAttributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        # LinkAttributes preserve the reparse-point identity while clearing a possible read-only bit.
+        # LinkAttributes 在清除可能存在的只读位时保留重解析点身份。
+        $LinkAttributes = $PathAttributes -band (-bnot [System.IO.FileAttributes]::ReadOnly)
+        [System.IO.File]::SetAttributes($Path, $LinkAttributes)
+        [System.IO.Directory]::Delete($Path, $false)
+        return
+    }
 
     # FilePaths are generated files that may inherit read-only Git object attributes.
     # FilePaths 是可能继承 Git 对象只读属性的生成文件。
@@ -176,7 +188,12 @@ function Clear-DirectoryAttributes {
     $DirectoryPaths = [System.IO.Directory]::EnumerateDirectories($Path)
     foreach ($DirectoryPath in $DirectoryPaths) {
         Clear-DirectoryAttributes -Path $DirectoryPath
-        [System.IO.File]::SetAttributes($DirectoryPath, [System.IO.FileAttributes]::Directory)
+        # SurvivingDirectory distinguishes ordinary directories from reparse points deleted by the recursive call.
+        # SurvivingDirectory 区分普通目录与已由递归调用删除的重解析点。
+        $SurvivingDirectory = [System.IO.Directory]::Exists($DirectoryPath)
+        if ($SurvivingDirectory) {
+            [System.IO.File]::SetAttributes($DirectoryPath, [System.IO.FileAttributes]::Directory)
+        }
     }
     [System.IO.File]::SetAttributes($Path, [System.IO.FileAttributes]::Directory)
 }
@@ -283,9 +300,9 @@ function Install-ManagedNodeRuntime {
     $PnpmVersion = "11.11.0"
     # VerifiedReleaseTag identifies the release whose fetcher digest is pinned below.
     # VerifiedReleaseTag 标识下方固定拉取器摘要对应的发布版本。
-    $VerifiedReleaseTag = "v0.5.2"
-    # ExpectedFetcherHash is the SHA-256 digest of the v0.5.2 PowerShell fetcher.
-    # ExpectedFetcherHash 是 v0.5.2 PowerShell 拉取脚本的 SHA-256 摘要。
+    $VerifiedReleaseTag = "v0.5.5"
+    # ExpectedFetcherHash is the SHA-256 digest of the v0.5.5 PowerShell fetcher.
+    # ExpectedFetcherHash 是 v0.5.5 PowerShell 拉取脚本的 SHA-256 摘要。
     $ExpectedFetcherHash = "59e0bf3b6e85b34299a16517e4045e88facd08165ad9511df99fc33d9295dcbe"
     if ($ReleaseTag -ne $VerifiedReleaseTag) {
         throw "Managed Node.js fetcher checksum is not registered for $ReleaseTag. Update the pinned checksum or use -SkipManagedNodeSetup."

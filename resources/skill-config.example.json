@@ -1,0 +1,10 @@
+{
+  "format_version": 1,
+  "revision": "1",
+  "skills": {
+    "demo-skill": {
+      "retry_count": "5",
+      "telemetry_enabled": "true"
+    }
+  }
+}

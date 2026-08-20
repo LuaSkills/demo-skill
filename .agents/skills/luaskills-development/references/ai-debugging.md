@@ -36,7 +36,7 @@ Require the setup script to:
 4. Verify SHA-256 before extraction.
 5. Store the complete debugger workspace under the Git-ignored `.luaskills-debug/` directory.
 6. Run the official `setup_runtime` flow to download matching Lua runtime packages.
-7. Download the v0.5.2 managed-runtime fetcher, verify its pinned SHA-256 digest, and install Node.js `24.18.0` with pnpm `11.11.0`.
+7. Download the v0.5.5 managed-runtime fetcher, verify its pinned SHA-256 digest, and install Node.js `24.18.0` with pnpm `11.11.0`.
 
 Use `-Force` or `--force` to rebuild the workspace. When only the debugger binary is needed, pass both `-SkipRuntimeSetup -SkipManagedNodeSetup` or `--skip-runtime-setup --skip-managed-node-setup`.
 

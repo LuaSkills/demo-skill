@@ -4,7 +4,7 @@
 
 这是一个可直接 Fork 的完整 LuaSkill 仓库模板。它提供正式 skill 示例、AI 开发技能、经过校验的官方 `luaskills-debug` 环境拉取、真实引擎调用、本地验证打包和 GitHub Actions 发布流程。
 
-当前模板对齐的 LuaSkills 正式版本是 **v0.5.2**，[`.luaskills-version`](.luaskills-version) 是调试器与文档的唯一版本基线。当前示例 skill 版本为 `0.2.0`；两种版本用途不同，不要求保持一致。
+当前模板对齐的 LuaSkills 正式版本是 **v0.5.5**，[`.luaskills-version`](.luaskills-version) 是调试器与文档的唯一版本基线。当前示例 skill 版本为 `0.2.0`；两种版本用途不同，不要求保持一致。
 
 ## Fork 后直接交给 AI
 
@@ -56,7 +56,7 @@ luaskills-debug-tool-{platform}.tar.gz.sha256
 bash ./scripts/setup_debug.sh --force
 ```
 
-初始化还会下载 v0.5.2 标签下的官方 `fetch_managed_runtimes.*`，验证固定 SHA-256 后才执行。上游脚本使用 Node.js 官方 `SHASUMS256.txt` 和 npm integrity 元数据校验 Node.js 与 pnpm。仅检查调试器本体时可跳过两类运行时：
+初始化还会下载 v0.5.5 标签下的官方 `fetch_managed_runtimes.*`，验证固定 SHA-256 后才执行。上游脚本使用 Node.js 官方 `SHASUMS256.txt` 和 npm integrity 元数据校验 Node.js 与 pnpm。仅检查调试器本体时可跳过两类运行时：
 
 ```powershell
 .\scripts\setup_debug.ps1 -SkipRuntimeSetup -SkipManagedNodeSetup
@@ -101,6 +101,16 @@ bash ./scripts/debug_skill.sh call --tool node-runtime-demo --args-file ./exampl
 - `list-tools`：列出真实可调用的本地与 canonical 工具名。
 - `call`：通过正式引擎调用一个工具。
 
+## LuaSkills 0.5.5 技能包配置示例
+
+`skill.yaml` 顶层的 `config` 块演示包级共享配置，并覆盖五种受支持类型：`string`、`integer`、`float`、`enum` 与 `boolean`。示例同时包含约束、默认值、必填敏感值、标题、分组、顺序、格式、重启提示、高级标记和枚举元数据。
+
+`runtime/config_validator.lua` 演示隔离的跨字段校验。`resources/skill-config.example.json` 展示唯一受支持的持久化文档形状，包括 `format_version`、十进制字符串 `revision` 和按包标识组织的 `skills` 对象。仓库内示例有意不保存必填敏感项 `api_token`。
+
+嵌入宿主必须显式提供一个绝对、可写、用户级的 `skill_config_root`。普通技能包配置存储在 `<skill_config_root>/skills/config.json`；技能包 Lua 只能通过 `vulcan.config.*` 访问自身命名空间，跨包管理权限由宿主负责。
+
+v0.5.5 独立版 `luaskills-debug` CLI 会在 `inspect` 阶段校验配置声明与 `config_validator` 路径，但尚未暴露 `skill_config_root` 参数；校验器本身只会在配置事务中执行。因此本仓库调试流程会真实校验技能包契约，不伪造配置写入；需要验证 `runtime-config` 读写与跨字段校验时，应使用已配置 `skill_config_root` 的宿主或 SDK。
+
 ## 一键验证并生成发布包
 
 Windows：
@@ -119,7 +129,7 @@ bash ./scripts/verify_skill.sh
 
 1. 打包过滤、路径穿越、符号链接与发布版本负向测试。
 2. 严格仓库结构与清单校验。
-3. 官方调试器 `inspect`。
+3. 官方调试器 `inspect`，包括技能包配置声明与 `config_validator` 路径。
 4. 官方调试器 `list-tools`。
 5. 使用参数示例真实调用四个工具；`node-runtime-demo` 会创建锁定的 pnpm 环境并执行两次 ESM Worker 调用。
 6. 确定性发布包构建。
@@ -184,13 +194,15 @@ bash ./scripts/tag_release.sh 0.2.0
 - `rg-check`：演示 skill 私有可选工具依赖及 `vulcan.deps.tools_path`。
 - `overflow-demo`：演示分页输出与 skill 私有 overflow template。
 - `node-runtime-demo`：演示受管 Node.js `24.18.0`、pnpm 锁定依赖、ESM handler、环境创建、Worker 复用与真实调用诊断。
+- 技能包配置：演示 LuaSkills 0.5.5 配置声明、UI 元数据、跨字段校验、缺少敏感配置时的指引与持久化 JSON 格式。
 
 ## 发布前五轮审核
 
 实现与真实流程测试通过后，AI 必须循环审核代码、清单、下载校验、跨平台脚本、打包白名单、Action 与文档。发现任何问题都必须立即修复、完整复测并把连续通过计数清零。只有连续五次完整审核均未发现问题，才能结束或发布。
 
-以 LuaSkills v0.5.2 官方文档作为协议依据：
+以 LuaSkills v0.5.5 官方文档作为协议依据：
 
-- [Lua Skill Development Manual](https://github.com/LuaSkills/luaskills/blob/v0.5.2/docs/skill-development.md)
-- [Lua Skill 开发手册（简体中文）](https://github.com/LuaSkills/luaskills/blob/v0.5.2/docs/zh-CN/skill-development.md)
-- [LuaSkills v0.5.2 Release](https://github.com/LuaSkills/luaskills/releases/tag/v0.5.2)
+- [Lua Skill Development Manual](https://github.com/LuaSkills/luaskills/blob/v0.5.5/docs/skill-development.md)
+- [Lua Skill 开发手册（简体中文）](https://github.com/LuaSkills/luaskills/blob/v0.5.5/docs/zh-CN/skill-development.md)
+- [LuaSkills 0.5.5 技能包配置升级说明](https://github.com/LuaSkills/luaskills/blob/v0.5.5/docs/upgrade-0.5.5.md)
+- [LuaSkills v0.5.5 Release](https://github.com/LuaSkills/luaskills/releases/tag/v0.5.5)

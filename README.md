@@ -4,7 +4,7 @@
 
 This repository is a complete, fork-ready LuaSkill template. It includes formal skill examples, an AI development skill, verified installation of the official `luaskills-debug` environment, real engine invocation, local validation and packaging, and GitHub Actions release workflows.
 
-The template targets the stable LuaSkills release **v0.5.2**. [`.luaskills-version`](.luaskills-version) is the single debugger and documentation version baseline. The example skill version is `0.2.0`; these versions have different purposes and do not need to match.
+The template targets the stable LuaSkills release **v0.5.5**. [`.luaskills-version`](.luaskills-version) is the single debugger and documentation version baseline. The example skill version is `0.2.0`; these versions have different purposes and do not need to match.
 
 ## Give the Fork to an AI
 
@@ -56,7 +56,7 @@ The entire directory is ignored by Git and cannot enter a commit or formal skill
 bash ./scripts/setup_debug.sh --force
 ```
 
-Setup also downloads the official v0.5.2 `fetch_managed_runtimes.*` script, verifies its pinned SHA-256 digest, and only then executes it. The upstream fetcher verifies Node.js through the official `SHASUMS256.txt` and pnpm through npm integrity metadata. To inspect only the debugger without either runtime family, use:
+Setup also downloads the official v0.5.5 `fetch_managed_runtimes.*` script, verifies its pinned SHA-256 digest, and only then executes it. The upstream fetcher verifies Node.js through the official `SHASUMS256.txt` and pnpm through npm integrity metadata. To inspect only the debugger without either runtime family, use:
 
 ```powershell
 .\scripts\setup_debug.ps1 -SkipRuntimeSetup -SkipManagedNodeSetup
@@ -101,6 +101,16 @@ Available commands:
 - `list-tools`: list real callable local and canonical tool names.
 - `call`: invoke a tool through the formal engine.
 
+## LuaSkills 0.5.5 Package Configuration Example
+
+The top-level `config` block in `skill.yaml` demonstrates package-scoped declarations for all five supported types: `string`, `integer`, `float`, `enum`, and `boolean`. It also covers constraints, defaults, a required sensitive value, titles, groups, ordering, formats, restart hints, advanced flags, and enum metadata.
+
+`runtime/config_validator.lua` demonstrates isolated cross-field validation. `resources/skill-config.example.json` shows the only supported persisted document shape with `format_version`, a decimal-string `revision`, and the package-keyed `skills` object. The required sensitive `api_token` is intentionally absent from the tracked example.
+
+The embedding host must explicitly provide one absolute, writable, user-level `skill_config_root`. Normal package values are stored at `<skill_config_root>/skills/config.json`; package Lua can access only its own namespace through `vulcan.config.*`, while cross-package administration belongs to the host.
+
+The v0.5.5 standalone `luaskills-debug` CLI validates configuration declarations and the `config_validator` path during `inspect`, but it does not expose a `skill_config_root` option. The validator itself runs only during configuration transactions. Therefore the repository debug flow validates the package contract without pretending to perform configuration writes. Use a host or SDK configured with `skill_config_root` to exercise `runtime-config` reads, writes, and cross-field validation.
+
 ## One-Command Verification and Packaging
 
 Windows:
@@ -119,7 +129,7 @@ The command executes:
 
 1. Negative tests for package filtering, path traversal, symbolic links, and release-version validation.
 2. Strict repository and manifest validation.
-3. Official debugger `inspect`.
+3. Official debugger `inspect`, including the package configuration declaration and `config_validator` path.
 4. Official debugger `list-tools`.
 5. Real invocation of all four example tools. `node-runtime-demo` creates the locked pnpm environment and performs two ESM Worker calls.
 6. Deterministic release-package generation.
@@ -184,13 +194,15 @@ The physical repository directory name defines the formal `skill_id`. Changing o
 - `rg-check`: demonstrates a private optional tool dependency and `vulcan.deps.tools_path`.
 - `overflow-demo`: demonstrates paged output and a skill-local overflow template.
 - `node-runtime-demo`: demonstrates managed Node.js `24.18.0`, pnpm-locked dependencies, an ESM handler, environment creation, Worker reuse, and real invocation diagnostics.
+- Package configuration: demonstrates LuaSkills 0.5.5 declarations, UI metadata, cross-field validation, missing-secret guidance, and the persisted JSON format.
 
 ## Five-Pass Pre-Release Review
 
 After implementation and the real flow test pass, the AI must repeatedly review code, manifests, download verification, cross-platform scripts, package whitelists, Actions, and documentation. Any finding must be fixed immediately, followed by a full retest and a reset of the consecutive-pass counter. Work may finish or release only after five consecutive complete reviews find no issues.
 
-Use the official LuaSkills v0.5.2 documentation as the protocol authority:
+Use the official LuaSkills v0.5.5 documentation as the protocol authority:
 
-- [Lua Skill Development Manual](https://github.com/LuaSkills/luaskills/blob/v0.5.2/docs/skill-development.md)
-- [Lua Skill Development Manual (Simplified Chinese)](https://github.com/LuaSkills/luaskills/blob/v0.5.2/docs/zh-CN/skill-development.md)
-- [LuaSkills v0.5.2 Release](https://github.com/LuaSkills/luaskills/releases/tag/v0.5.2)
+- [Lua Skill Development Manual](https://github.com/LuaSkills/luaskills/blob/v0.5.5/docs/skill-development.md)
+- [Lua Skill Development Manual (Simplified Chinese)](https://github.com/LuaSkills/luaskills/blob/v0.5.5/docs/zh-CN/skill-development.md)
+- [LuaSkills 0.5.5 Package Configuration Upgrade Guide](https://github.com/LuaSkills/luaskills/blob/v0.5.5/docs/upgrade-0.5.5.md)
+- [LuaSkills v0.5.5 Release](https://github.com/LuaSkills/luaskills/releases/tag/v0.5.5)

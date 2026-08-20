@@ -2,6 +2,64 @@ name: LuaSkills Demo Skill
 version: 0.2.0
 enable: true
 debug: false
+config_validator: runtime/config_validator.lua
+config:
+  - key: api_token
+    type: string
+    required: true
+    sensitive: true
+    description: Service access token used by the configuration example.
+    title: API token
+    group: Connection
+    order: 10
+    placeholder: sk-...
+    format: password
+    restart_required: true
+    constraints:
+      min_length: 1
+      max_length: 4096
+  - key: retry_count
+    type: integer
+    default: 3
+    description: Maximum request retry count used by the configuration example.
+    title: Retry count
+    group: Requests
+    order: 20
+    constraints:
+      minimum: 0
+      maximum: 10
+  - key: temperature
+    type: float
+    default: 0.7
+    description: Sampling temperature used by the configuration example.
+    title: Temperature
+    group: Requests
+    order: 30
+    advanced: true
+    constraints:
+      minimum: 0.0
+      maximum: 2.0
+  - key: provider
+    type: enum
+    default: openai
+    description: Service provider used by the configuration example.
+    title: Provider
+    group: Connection
+    order: 5
+    options:
+      - value: openai
+        label: OpenAI
+        description: OpenAI service.
+      - value: local
+        label: Local service
+        description: User-managed local service.
+  - key: telemetry_enabled
+    type: boolean
+    default: false
+    description: Whether telemetry is enabled for the configuration example.
+    title: Telemetry
+    group: Diagnostics
+    order: 40
 lancedb:
   enable: false
   log_level: warning
@@ -29,6 +87,9 @@ help:
     - name: node-runtime
       description: Explain the managed Node.js runtime invocation demo.
       file: help/node-runtime.md
+    - name: package-config
+      description: Explain the LuaSkills 0.5.5 package configuration declaration and persisted format.
+      file: help/package-config.md
 entries:
   - name: demo-status
     description: Return stable runtime diagnostics for install and lifecycle testing.
