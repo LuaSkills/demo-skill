@@ -4,7 +4,7 @@
 
 这是一个可直接 Fork 的完整 LuaSkill 仓库模板。它提供正式 skill 示例、AI 开发技能、经过校验的官方 `luaskills-debug` 环境拉取、真实引擎调用、本地验证打包和 GitHub Actions 发布流程。
 
-当前模板对齐的 LuaSkills 正式版本是 **v0.5.5**，[`.luaskills-version`](.luaskills-version) 是调试器与文档的唯一版本基线。当前示例 skill 版本为 `0.2.0`；两种版本用途不同，不要求保持一致。
+当前模板对齐的 LuaSkills 正式版本是 **v0.5.5**，[`.luaskills-version`](.luaskills-version) 是调试器与文档的唯一版本基线。当前示例 skill 版本为 `0.2.1`；两种版本用途不同，不要求保持一致。
 
 ## Fork 后直接交给 AI
 
@@ -167,14 +167,14 @@ licenses/
 - **Validate and Package LuaSkill**：Pull Request 或手动触发时下载调试器与运行时，加载 skill、枚举工具、执行真实调用、打包并上传 `<仓库名>-verified-package`。
 - **Release LuaSkill**：推送 `v*` 标签时重新执行相同的真实调试流程，创建 GitHub Release，并且只上传正式 zip 和 checksum。
 
-发布脚本会拒绝脏工作区，要求参数与 `skill.yaml.version` 完全一致，并在创建、推送标签前重新执行完整验证。当前版本为 `0.2.0`：
+发布脚本会拒绝脏工作区，要求参数与 `skill.yaml.version` 完全一致，并在创建、推送标签前重新执行完整验证。当前版本为 `0.2.1`：
 
 ```powershell
-.\scripts\tag_release.ps1 0.2.0
+.\scripts\tag_release.ps1 0.2.1
 ```
 
 ```bash
-bash ./scripts/tag_release.sh 0.2.0
+bash ./scripts/tag_release.sh 0.2.1
 ```
 
 ## Fork 后需要替换的内容

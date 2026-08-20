@@ -4,7 +4,7 @@
 
 This repository is a complete, fork-ready LuaSkill template. It includes formal skill examples, an AI development skill, verified installation of the official `luaskills-debug` environment, real engine invocation, local validation and packaging, and GitHub Actions release workflows.
 
-The template targets the stable LuaSkills release **v0.5.5**. [`.luaskills-version`](.luaskills-version) is the single debugger and documentation version baseline. The example skill version is `0.2.0`; these versions have different purposes and do not need to match.
+The template targets the stable LuaSkills release **v0.5.5**. [`.luaskills-version`](.luaskills-version) is the single debugger and documentation version baseline. The example skill version is `0.2.1`; these versions have different purposes and do not need to match.
 
 ## Give the Fork to an AI
 
@@ -167,14 +167,14 @@ The repository contains two reusable workflows:
 - **Validate and Package LuaSkill**: on pull requests or manual dispatch, downloads the debugger and runtimes, loads the skill, enumerates tools, performs real invocations, packages the skill, and uploads `<repository-name>-verified-package`.
 - **Release LuaSkill**: on a `v*` tag, reruns the same real debug flow, creates a GitHub Release, and uploads only the formal zip and checksum.
 
-The release script rejects a dirty worktree, requires its argument to match `skill.yaml.version`, and reruns the complete verification flow before it creates and pushes the tag. For version `0.2.0`:
+The release script rejects a dirty worktree, requires its argument to match `skill.yaml.version`, and reruns the complete verification flow before it creates and pushes the tag. For version `0.2.1`:
 
 ```powershell
-.\scripts\tag_release.ps1 0.2.0
+.\scripts\tag_release.ps1 0.2.1
 ```
 
 ```bash
-bash ./scripts/tag_release.sh 0.2.0
+bash ./scripts/tag_release.sh 0.2.1
 ```
 
 ## What to Replace After Forking
