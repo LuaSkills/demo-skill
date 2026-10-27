@@ -55,4 +55,41 @@ node_runtime:
   package_json: node/package.json
   lockfile: node/pnpm-lock.yaml
 lua_dependencies: []
-ffi_dependencies: []
+ffi_dependencies:
+  - name: demo-native
+    version: "1.0.0"
+    required: false
+    scope: skill
+    source:
+      type: bundled
+    packages:
+      windows-x64:
+        archive_type: raw
+        path: native/windows-x64/demo_native.dll
+        exports:
+          - archive_path: demo_native.dll
+            target_path: lib/demo_native.dll
+      linux-x64:
+        archive_type: raw
+        path: native/linux-x64/libdemo_native.so
+        exports:
+          - archive_path: libdemo_native.so
+            target_path: lib/libdemo_native.so
+      linux-arm64:
+        archive_type: raw
+        path: native/linux-arm64/libdemo_native.so
+        exports:
+          - archive_path: libdemo_native.so
+            target_path: lib/libdemo_native.so
+      macos-x64:
+        archive_type: raw
+        path: native/macos-x64/libdemo_native.dylib
+        exports:
+          - archive_path: libdemo_native.dylib
+            target_path: lib/libdemo_native.dylib
+      macos-arm64:
+        archive_type: raw
+        path: native/macos-arm64/libdemo_native.dylib
+        exports:
+          - archive_path: libdemo_native.dylib
+            target_path: lib/libdemo_native.dylib

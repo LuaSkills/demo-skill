@@ -97,19 +97,22 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 acquire_debug_lock
 
-# LauncherPath is the official debug package shell launcher.
-# LauncherPath 是官方调试包的 Shell 启动器。
-LAUNCHER_PATH="$DEBUG_ROOT/debug.sh"
 # Setup runs idempotently inside the repository lock before every debug command.
 # Setup 在每个调试命令前于仓库锁内幂等执行。
 bash "$PROJECT_ROOT/scripts/setup_debug.sh"
 
-# PythonCommand is the interpreter used to build a clean debugger source stage.
-# PythonCommand 是用于构建干净调试源暂存区的解释器。
-PYTHON_COMMAND="${PYTHON_COMMAND:-python3}"
-# StagedSkillPath contains only files included by the formal release-package whitelist.
-# StagedSkillPath 仅包含正式发布包白名单收集的文件。
-STAGED_SKILL_PATH="$("$PYTHON_COMMAND" "$PROJECT_ROOT/scripts/stage_debug_skill.py")"
+# BinaryPath is the official debugger executable. The v0.7.1 package launcher forwards only the classic flags,
+# so the wrapper calls the executable directly and every option after the command passes through unchanged.
+# BinaryPath 是官方调试器可执行文件。v0.7.1 包内启动器只转发传统参数，
+# 因此封装脚本直接调用可执行文件，命令之后的所有选项原样透传。
+BINARY_PATH="$DEBUG_ROOT/bin/luaskills-debug"
+# RuntimeRoot is the package-local runtime used by every official debugger command.
+# RuntimeRoot 是所有官方调试命令共同使用的包内 runtime。
+RUNTIME_ROOT="$DEBUG_ROOT/runtime"
+if [ ! -x "$BINARY_PATH" ]; then
+  echo "luaskills-debug executable was not found or is not executable: $BINARY_PATH" >&2
+  exit 1
+fi
 
 # Command is the official debugger subcommand, defaulting to inspect.
 # Command 是官方调试器子命令，默认使用 inspect。
@@ -118,16 +121,19 @@ if [ "$#" -gt 0 ]; then
   shift
 fi
 
-if [ "$COMMAND" = "sync" ]; then
-  # BinaryPath is the official executable used because the Unix launcher omits sync forwarding.
-  # BinaryPath 是官方可执行程序；Unix 启动器未转发 sync，因此此处直接调用。
-  BINARY_PATH="$DEBUG_ROOT/bin/luaskills-debug"
-  # RuntimeRoot is the same package-local runtime used by all official launcher commands.
-  # RuntimeRoot 是所有官方启动命令共同使用的包内 runtime。
-  RUNTIME_ROOT="$DEBUG_ROOT/runtime"
-  "$BINARY_PATH" sync --runtime-root "$RUNTIME_ROOT" --skill-path "$STAGED_SKILL_PATH" "$@"
+if [ "$COMMAND" = "probe-mirrors" ]; then
+  # Mirror probing measures download hosts only, so it needs neither a staged skill nor a runtime root.
+  # 镜像测速只测量下载主机，因此既不需要暂存 skill，也不需要 runtime root。
+  "$BINARY_PATH" probe-mirrors "$@"
   exit $?
 fi
 
-"$LAUNCHER_PATH" "$COMMAND" --skill-path "$STAGED_SKILL_PATH" "$@"
+# PythonCommand is the interpreter used to build a clean debugger source stage.
+# PythonCommand 是用于构建干净调试源暂存区的解释器。
+PYTHON_COMMAND="${PYTHON_COMMAND:-python3}"
+# StagedSkillPath contains only files included by the formal release-package whitelist.
+# StagedSkillPath 仅包含正式发布包白名单收集的文件。
+STAGED_SKILL_PATH="$("$PYTHON_COMMAND" "$PROJECT_ROOT/scripts/stage_debug_skill.py")"
+
+"$BINARY_PATH" "$COMMAND" --runtime-root "$RUNTIME_ROOT" --skill-path "$STAGED_SKILL_PATH" "$@"
 exit $?

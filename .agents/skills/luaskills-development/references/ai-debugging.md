@@ -36,7 +36,7 @@ Require the setup script to:
 4. Verify SHA-256 before extraction.
 5. Store the complete debugger workspace under the Git-ignored `.luaskills-debug/` directory.
 6. Run the official `setup_runtime` flow to download matching Lua runtime packages.
-7. Download the v0.5.5 managed-runtime fetcher, verify its pinned SHA-256 digest, and install Node.js `24.18.0` with pnpm `11.11.0`.
+7. Download the v0.7.1 managed-runtime fetcher, verify its pinned SHA-256 digest, and install Node.js `24.18.0` with pnpm `11.11.0`.
 
 Use `-Force` or `--force` to rebuild the workspace. When only the debugger binary is needed, pass both `-SkipRuntimeSetup -SkipManagedNodeSetup` or `--skip-runtime-setup --skip-managed-node-setup`.
 
@@ -56,8 +56,7 @@ Windows:
 ```powershell
 .\scripts\debug_skill.ps1 -Command inspect
 .\scripts\debug_skill.ps1 -Command list-tools
-.\scripts\debug_skill.ps1 -Command call -Tool demo-status -ArgsFile .\examples\debug\demo-status.args.json
-.\scripts\debug_skill.ps1 -Command call -Tool node-runtime-demo -ArgsFile .\examples\debug\node-runtime-demo.args.json -Output json
+.\scripts\debug_skill.ps1 -Command call -Tool hello -ArgsFile .\examples\debug\hello.args.json -Output json
 .\scripts\verify_skill.ps1
 ```
 
@@ -66,8 +65,7 @@ Linux/macOS:
 ```bash
 bash ./scripts/debug_skill.sh inspect
 bash ./scripts/debug_skill.sh list-tools
-bash ./scripts/debug_skill.sh call --tool demo-status --args-file ./examples/debug/demo-status.args.json
-bash ./scripts/debug_skill.sh call --tool node-runtime-demo --args-file ./examples/debug/node-runtime-demo.args.json --output json
+bash ./scripts/debug_skill.sh call --tool hello --args-file ./examples/debug/hello.args.json --output json
 bash ./scripts/verify_skill.sh
 ```
 
@@ -82,8 +80,7 @@ Example argument file:
 
 ```json
 {
-  "name": "ai-debug",
-  "include_context": true
+  "name": "ai-debug"
 }
 ```
 
@@ -116,6 +113,10 @@ Read `skill.yaml.entries[].parameters` and the target Lua entry. Confirm require
 ### Unavailable Dependency
 
 Distinguish Lua runtime packages, skill-owned `dependencies.yaml`, and host-managed capabilities. Repair only the layer identified by the debugger's real error, and never hard-code dependency paths into source code.
+
+LuaSkills 0.7.1 rejects the whole skill when a bundled payload is missing or the current platform has no package entry, even with `required: false`. Build the host payload with `scripts/build_native.py`; the debug wrapper reports when it drops an unbuilt optional bundled dependency from the stage.
+
+When a `github_release` download is slow or rate-limited, measure mirrors with `probe-mirrors`, then pass `--github-mirror <id|url>` and `--github-token-env <NAME>` (`-GithubMirror`, `-GithubTokenEnv` on Windows). Pass the name of an environment variable that holds the token, never the token itself.
 
 ## Pre-Release Closure
 

@@ -1,6 +1,6 @@
 # Managed Node.js Runtime Demo
 
-`node-runtime-demo` demonstrates the LuaSkills v0.5.5 managed Node.js runtime contract.
+`node-runtime-demo` demonstrates the LuaSkills managed Node.js runtime contract.
 
 It uses the exact versions declared in `dependencies.yaml`:
 

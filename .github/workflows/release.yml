@@ -9,7 +9,56 @@ permissions:
   contents: write
 
 jobs:
+  # >>> demo-only
+  native:
+    name: Build demo-native (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-24.04
+          - platform: linux-arm64
+            runner: ubuntu-24.04-arm
+          - platform: macos-x64
+            runner: macos-15-intel
+          - platform: macos-arm64
+            runner: macos-15
+          - platform: windows-x64
+            runner: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      # Windows selects MSVC through the default pwsh shell, which keeps Git Bash's link.exe off PATH.
+      # Windows 通过默认 pwsh shell 选择 MSVC，避免 Git Bash 的 link.exe 出现在 PATH 中。
+      - name: Build native library
+        env:
+          CC: ${{ runner.os == 'Windows' && 'cl' || '' }}
+        run: python scripts/build_native.py
+
+      - name: Upload native library
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.platform }}
+          path: native/${{ matrix.platform }}/*
+          if-no-files-found: error
+  # <<< demo-only
+
   release:
+    # >>> demo-only
+    needs: native
+    # <<< demo-only
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -25,6 +74,27 @@ jobs:
 
       - name: Run complete debugger flow
         run: bash ./scripts/verify_skill.sh
+
+      # >>> demo-only
+      - name: Download native libraries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: native-artifacts
+
+      - name: Place native libraries
+        shell: bash
+        run: |
+          for artifact_dir in native-artifacts/native-*; do
+            platform="${artifact_dir##*/native-}"
+            mkdir -p "native/$platform"
+            cp -f "$artifact_dir"/* "native/$platform/"
+          done
+          rm -rf native-artifacts
+      # <<< demo-only
+
+      - name: Package with every bundled payload
+        run: python ./scripts/package_skill.py --require-bundled
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4

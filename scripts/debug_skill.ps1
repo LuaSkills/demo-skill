@@ -1,12 +1,12 @@
 ﻿<#
 .SYNOPSIS
-Run the official LuaSkills debug launcher against the repository-root skill.
-使用官方 LuaSkills 调试启动器运行仓库根目录中的 skill。
+Run the official LuaSkills debugger against the repository-root skill.
+使用官方 LuaSkills 调试器运行仓库根目录中的 skill。
 #>
 param(
-    # Debug command forwarded to the official launcher.
-    # 转发给官方启动器的调试命令。
-    [ValidateSet("sync", "inspect", "list-tools", "call")]
+    # Debug command forwarded to the official debugger.
+    # 转发给官方调试器的调试命令。
+    [ValidateSet("sync", "inspect", "list-tools", "call", "probe-mirrors")]
     [string]$Command = "inspect",
     # Tool name required by the call command.
     # call 命令需要的工具名称。
@@ -23,7 +23,13 @@ param(
     [string]$Output = "pretty",
     # Whether to enable the host_result bridge.
     # 是否启用 host_result 桥接。
-    [switch]$EnableHostResult
+    [switch]$EnableHostResult,
+    # Built-in mirror id or mirror URL for GitHub release downloads; probe-mirrors accepts several.
+    # GitHub Release 下载使用的内置镜像标识或镜像地址；probe-mirrors 可接收多个。
+    [string[]]$GithubMirror = @(),
+    # Name of the environment variable that holds a GitHub token; never the token itself.
+    # 保存 GitHub 令牌的环境变量名称；绝不是令牌本身。
+    [string]$GithubTokenEnv = ""
 )
 
 # ErrorActionPreference makes staging and debugger failures explicit and terminating.
@@ -99,14 +105,27 @@ $ProjectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 # DebugRoot is the ignored standalone debug workspace.
 # DebugRoot 是被忽略的独立调试工作区。
 $DebugRoot = Join-Path $ProjectRoot ".luaskills-debug"
-# LauncherPath is the official debug package PowerShell launcher.
-# LauncherPath 是官方调试包的 PowerShell 启动器。
-$LauncherPath = Join-Path $DebugRoot "debug.ps1"
+# BinaryPath is the official debugger executable. The v0.7.1 package launchers forward only the classic flags,
+# so the wrapper calls the executable directly to reach --github-mirror, --github-token-env, and probe-mirrors.
+# BinaryPath 是官方调试器可执行文件。v0.7.1 包内启动器只转发传统参数，
+# 因此封装脚本直接调用可执行文件，以支持 --github-mirror、--github-token-env 与 probe-mirrors。
+$BinaryPath = Join-Path $DebugRoot "bin\luaskills-debug.exe"
+# RuntimeRoot is the package-local runtime used by every official debugger command.
+# RuntimeRoot 是所有官方调试命令共同使用的包内 runtime。
+$RuntimeRoot = Join-Path $DebugRoot "runtime"
+if ($Command -eq "probe-mirrors") {
+    if ($Tool -or $ArgsJson -or $ArgsFile -or $EnableHostResult -or $GithubTokenEnv) {
+        throw "probe-mirrors accepts only -GithubMirror and -Output."
+    }
+}
+elseif ($GithubMirror.Count -gt 1) {
+    throw "$Command accepts at most one -GithubMirror value; only probe-mirrors compares several mirrors."
+}
 # DebugMutex serializes setup, staging, synchronization, and invocation for this repository.
 # DebugMutex 串行化当前仓库的初始化、暂存、同步与调用。
 $DebugMutex = Enter-RepositoryDebugMutex -ProjectRoot $ProjectRoot
-# ExitCode preserves the official launcher process result until after mutex release.
-# ExitCode 保留官方启动器进程结果，直到互斥锁释放后再退出。
+# ExitCode preserves the official debugger process result until after mutex release.
+# ExitCode 保留官方调试器进程结果，直到互斥锁释放后再退出。
 $ExitCode = 1
 
 try {
@@ -118,37 +137,48 @@ try {
         throw "LuaSkills debug workspace setup failed with exit code $LASTEXITCODE."
     }
 
-    # StageScript copies only formal release-package files into the ignored workspace.
-    # StageScript 仅把正式发布包文件复制到被忽略的工作区。
-    $StageScript = Join-Path $PSScriptRoot "stage_debug_skill.py"
-    # StagedSkillPath is the clean source directory synchronized by the official debugger.
-    # StagedSkillPath 是由官方调试器同步的干净源目录。
-    $StagedSkillPath = (& python $StageScript | Select-Object -Last 1).Trim()
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $StagedSkillPath -PathType Container)) {
-        throw "Failed to stage the current LuaSkill for debugging."
+    if (-not (Test-Path -LiteralPath $BinaryPath -PathType Leaf)) {
+        throw "luaskills-debug executable was not found: $BinaryPath"
     }
 
-    # ForwardedParameters contains only arguments explicitly supported by the official launcher.
-    # ForwardedParameters 只包含官方启动器明确支持的参数。
-    $ForwardedParameters = @{
-        Command = $Command
-        SkillPath = $StagedSkillPath
-        Output = $Output
+    # ForwardedArgs contains only options accepted by the selected debugger subcommand.
+    # ForwardedArgs 只包含所选调试器子命令接受的选项。
+    $ForwardedArgs = @($Command)
+    if ($Command -ne "probe-mirrors") {
+        # StageScript copies only formal release-package files into the ignored workspace.
+        # StageScript 仅把正式发布包文件复制到被忽略的工作区。
+        $StageScript = Join-Path $PSScriptRoot "stage_debug_skill.py"
+        # StagedSkillPath is the clean source directory synchronized by the official debugger.
+        # StagedSkillPath 是由官方调试器同步的干净源目录。
+        $StagedSkillPath = (& python $StageScript | Select-Object -Last 1).Trim()
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $StagedSkillPath -PathType Container)) {
+            throw "Failed to stage the current LuaSkill for debugging."
+        }
+        $ForwardedArgs += @("--runtime-root", $RuntimeRoot, "--skill-path", $StagedSkillPath)
+        if (-not [string]::IsNullOrWhiteSpace($Tool)) {
+            $ForwardedArgs += @("--tool", $Tool)
+        }
+        if (-not [string]::IsNullOrWhiteSpace($ArgsJson)) {
+            $ForwardedArgs += @("--args-json", $ArgsJson)
+        }
+        if (-not [string]::IsNullOrWhiteSpace($ArgsFile)) {
+            $ForwardedArgs += @("--args-file", (Resolve-Path -LiteralPath $ArgsFile).Path)
+        }
+        if ($EnableHostResult) {
+            $ForwardedArgs += "--enable-host-result"
+        }
+        if (-not [string]::IsNullOrWhiteSpace($GithubTokenEnv)) {
+            $ForwardedArgs += @("--github-token-env", $GithubTokenEnv)
+        }
     }
-    if (-not [string]::IsNullOrWhiteSpace($Tool)) {
-        $ForwardedParameters.Tool = $Tool
+    # Mirror is one built-in mirror id or mirror URL passed through unchanged.
+    # Mirror 是原样传递的单个内置镜像标识或镜像地址。
+    foreach ($Mirror in $GithubMirror) {
+        $ForwardedArgs += @("--github-mirror", $Mirror)
     }
-    if (-not [string]::IsNullOrWhiteSpace($ArgsJson)) {
-        $ForwardedParameters.ArgsJson = $ArgsJson
-    }
-    if (-not [string]::IsNullOrWhiteSpace($ArgsFile)) {
-        $ForwardedParameters.ArgsFile = (Resolve-Path -LiteralPath $ArgsFile).Path
-    }
-    if ($EnableHostResult) {
-        $ForwardedParameters.EnableHostResult = $true
-    }
+    $ForwardedArgs += @("--output", $Output)
 
-    & $LauncherPath @ForwardedParameters
+    & $BinaryPath @ForwardedArgs
     $ExitCode = $LASTEXITCODE
 }
 finally {

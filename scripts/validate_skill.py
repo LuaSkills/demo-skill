@@ -5,6 +5,7 @@ Validate the demo LuaSkill repository against the strict package rules.
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -97,6 +98,10 @@ def resolve_package_file(root: Path, relative_path: str, label: str) -> Path:
 """
 Validate the strict top-level repository layout.
 校验严格的顶层仓库目录结构。
+
+Optional package directories such as node/, native/, overflow_templates/, and resources/ are checked through the
+manifests that reference them, so an unused optional directory may be absent.
+node/、native/、overflow_templates/ 与 resources/ 等可选包目录通过引用它们的清单校验，因此未使用的可选目录可以不存在。
 """
 def validate_layout(root: Path) -> None:
     required_files = [
@@ -107,8 +112,6 @@ def validate_layout(root: Path) -> None:
     required_dirs = [
         root / "runtime",
         root / "help",
-        root / "overflow_templates",
-        root / "resources",
         root / "licenses",
     ]
 
@@ -262,6 +265,29 @@ def validate_dependencies(root: Path) -> None:
     for group_name in ("lua_dependencies", "ffi_dependencies"):
         group = dependency_manifest.get(group_name, [])
         require(isinstance(group, list), f"{group_name} must be a YAML list")
+        # Library is one Lua or FFI dependency validated with the same protocol fields as tools.
+        # Library 是一个按与工具相同协议字段校验的 Lua 或 FFI 依赖。
+        for library in group:
+            require(isinstance(library, dict), f"Each {group_name} entry must be one YAML object")
+            # LibraryName identifies the dependency in diagnostics and installed paths.
+            # LibraryName 在诊断信息与安装路径中标识该依赖。
+            library_name = library.get("name")
+            require(isinstance(library_name, str) and library_name, f"Each {group_name} entry requires a non-empty name")
+            # LibraryRequired preserves the protocol default when the field is omitted.
+            # LibraryRequired 在字段省略时保留协议默认语义。
+            library_required = library.get("required")
+            require(library_required is None or isinstance(library_required, bool), f"Dependency '{library_name}' has an invalid required field")
+            require(isinstance(library.get("source"), dict), f"Dependency '{library_name}' requires one source object")
+            # LibraryPackages preserves the protocol's empty-map default when omitted.
+            # LibraryPackages 在字段省略时保留协议的空映射默认值。
+            library_packages = library.get("packages")
+            require(library_packages is None or isinstance(library_packages, dict), f"Dependency '{library_name}' has invalid platform packages")
+
+    # GroupName iterates over every dependency list that may contain a bundled source.
+    # GroupName 遍历所有可能包含内置来源的依赖列表。
+    for group_name in ("tool_dependencies", "lua_dependencies", "ffi_dependencies"):
+        for dependency in dependency_manifest.get(group_name, []) or []:
+            validate_bundled_dependency(dependency)
 
     # NodeRuntime is the optional managed Node.js declaration defined by the current protocol.
     # NodeRuntime 是当前协议定义的可选受管 Node.js 声明。
@@ -293,6 +319,82 @@ def validate_dependencies(root: Path) -> None:
 
 
 """
+Validate the package declaration of one dependency whose payload ships inside the skill package.
+校验一个载荷随 skill 包分发的依赖的包声明。
+
+Args:
+    dependency: One already shape-checked dependency entry from any dependency group.
+    dependency：来自任一依赖分组、已完成形状校验的依赖条目。
+
+Returns:
+    None; payload existence is enforced by package_skill.py --require-bundled, not here.
+    返回空值；载荷是否存在由 package_skill.py --require-bundled 负责，此处不检查。
+"""
+def validate_bundled_dependency(dependency: dict) -> None:
+    if dependency["source"].get("type") != "bundled":
+        return
+    # DependencyName identifies the bundled dependency in diagnostics.
+    # DependencyName 在诊断信息中标识内置依赖。
+    dependency_name = dependency["name"]
+    # Packages must name one payload for every platform the dependency supports.
+    # Packages 必须为依赖支持的每个平台指定一个载荷。
+    packages = dependency.get("packages") or {}
+    require(packages, f"Bundled dependency '{dependency_name}' must declare at least one platform package")
+    for platform_key, package in packages.items():
+        require(isinstance(package, dict), f"Bundled dependency '{dependency_name}' platform '{platform_key}' must be one YAML object")
+        require(package.get("archive_type") in {"raw", "zip", "tar_gz"}, f"Bundled dependency '{dependency_name}' platform '{platform_key}' has an unsupported archive_type")
+        # PayloadPath is resolved by LuaSkills relative to the installed skill directory.
+        # PayloadPath 由 LuaSkills 相对已安装 skill 目录解析。
+        payload_path = package.get("path")
+        require(isinstance(payload_path, str) and payload_path, f"Bundled dependency '{dependency_name}' platform '{platform_key}' must declare path")
+        # DeclaredPath is checked structurally because the payload may not be built locally yet.
+        # DeclaredPath 只做结构检查，因为本地可能尚未构建该载荷。
+        declared_path = Path(payload_path)
+        require(
+            not declared_path.is_absolute() and "\\" not in payload_path and ".." not in declared_path.parts,
+            f"Bundled dependency '{dependency_name}' platform '{platform_key}' path must be a package-relative POSIX path: {payload_path}",
+        )
+        # Exports must contain exactly one target for raw payloads, matching the LuaSkills installer.
+        # Exports 对 raw 载荷必须恰好包含一个目标，与 LuaSkills 安装器一致。
+        exports = package.get("exports")
+        require(isinstance(exports, list) and exports, f"Bundled dependency '{dependency_name}' platform '{platform_key}' must declare exports")
+        if package.get("archive_type") == "raw":
+            require(len(exports) == 1, f"Bundled dependency '{dependency_name}' platform '{platform_key}' raw payload must declare exactly one export")
+
+
+"""
+Validate that every debug example names a declared entry and contains one JSON object.
+校验每个调试示例都对应已声明入口并包含一个 JSON 对象。
+
+Args:
+    root: Repository root containing skill.yaml and examples/debug/.
+    root：包含 skill.yaml 与 examples/debug/ 的仓库根目录。
+
+Returns:
+    None after every <entry>.args.json file passes.
+    所有 <entry>.args.json 文件通过后返回空值。
+"""
+def validate_examples(root: Path) -> None:
+    # EntryNames are the tool names that example files may target.
+    # EntryNames 是示例文件可以指向的工具名称。
+    entry_names = {entry.get("name") for entry in load_yaml(root / "skill.yaml").get("entries", []) or []}
+    # ExamplesRoot holds the argument files used by the verify scripts.
+    # ExamplesRoot 保存验证脚本使用的参数文件。
+    examples_root = root / "examples" / "debug"
+    if not examples_root.is_dir():
+        return
+    for example_path in sorted(examples_root.glob("*.args.json")):
+        # ToolName is derived from the <entry>.args.json naming convention.
+        # ToolName 依据 <entry>.args.json 命名约定推导。
+        tool_name = example_path.name[: -len(".args.json")]
+        require(tool_name in entry_names, f"Debug example does not match a declared entry: {example_path.relative_to(root).as_posix()}")
+        # ExamplePayload must be one object because tools receive named arguments.
+        # ExamplePayload 必须是对象，因为工具接收具名参数。
+        example_payload = json.loads(example_path.read_text(encoding="utf-8"))
+        require(isinstance(example_payload, dict), f"Debug example must contain one JSON object: {example_path.relative_to(root).as_posix()}")
+
+
+"""
 Execute the repository validation flow and return one process exit code.
 执行仓库校验流程并返回进程退出码。
 """
@@ -303,6 +405,7 @@ def main() -> int:
         validate_documentation(root)
         validate_manifest(root)
         validate_dependencies(root)
+        validate_examples(root)
     except Exception as error:  # noqa: BLE001
         print(f"Validation failed: {error}")
         return 1

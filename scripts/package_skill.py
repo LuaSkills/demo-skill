@@ -28,6 +28,7 @@ PACKAGE_ROOT_NAMES = frozenset(
         "runtime",
         "node",
         "python",
+        "native",
         "help",
         "overflow_templates",
         "resources",
@@ -40,6 +41,9 @@ GENERATED_DIRECTORY_NAMES = frozenset({"node_modules", ".pnpm-store", "__pycache
 # GeneratedFileNames identifies platform metadata files that never ship.
 # GeneratedFileNames 标识绝不进入发布包的平台元数据文件。
 GENERATED_FILE_NAMES = frozenset({".DS_Store"})
+# DependencyGroupNames are the dependencies.yaml lists whose entries may use a bundled source.
+# DependencyGroupNames 是条目可以使用内置来源的 dependencies.yaml 列表。
+DEPENDENCY_GROUP_NAMES = ("tool_dependencies", "lua_dependencies", "ffi_dependencies")
 
 
 """
@@ -215,6 +219,81 @@ def collect_package_paths(root: Path) -> list[Path]:
 
 
 """
+Return every bundled payload path declared by dependencies.yaml.
+返回 dependencies.yaml 声明的全部内置载荷路径。
+
+Args:
+    root: Repository root containing dependencies.yaml.
+    root：包含 dependencies.yaml 的仓库根目录。
+
+Returns:
+    Sorted package-relative payload paths exactly as declared, one per platform package.
+    按声明原样排序的包内相对载荷路径，每个平台包一条。
+"""
+def declared_bundled_paths(root: Path) -> list[str]:
+    # ManifestPath is optional for packages without dependencies.
+    # ManifestPath 对没有依赖的技能包而言是可选的。
+    manifest_path = root / "dependencies.yaml"
+    if not manifest_path.is_file():
+        return []
+    with manifest_path.open("r", encoding="utf-8") as handle:
+        manifest = yaml.safe_load(handle) or {}
+    if not isinstance(manifest, dict):
+        raise RuntimeError("dependencies.yaml must contain one YAML object")
+
+    # DeclaredPaths collects one entry per bundled platform package.
+    # DeclaredPaths 为每个内置平台包收集一条路径。
+    declared_paths: list[str] = []
+    for group_name in DEPENDENCY_GROUP_NAMES:
+        for dependency in manifest.get(group_name) or []:
+            if not isinstance(dependency, dict):
+                raise RuntimeError(f"Each {group_name} entry must be one YAML object")
+            # Source identifies whether the payload ships inside the package.
+            # Source 用于判断载荷是否随包分发。
+            source = dependency.get("source") or {}
+            if not isinstance(source, dict) or source.get("type") != "bundled":
+                continue
+            # DependencyName labels diagnostics for malformed bundled packages.
+            # DependencyName 为畸形内置包的诊断信息提供标签。
+            dependency_name = dependency.get("name")
+            for platform_key, package in sorted((dependency.get("packages") or {}).items()):
+                # PayloadPath is the package-relative file that LuaSkills installs for this platform.
+                # PayloadPath 是 LuaSkills 为该平台安装的包内相对文件。
+                payload_path = package.get("path") if isinstance(package, dict) else None
+                if not isinstance(payload_path, str) or not payload_path:
+                    raise RuntimeError(
+                        f"Bundled dependency '{dependency_name}' platform '{platform_key}' must declare path"
+                    )
+                declared_paths.append(payload_path)
+    return sorted(declared_paths)
+
+
+"""
+Fail unless every declared bundled payload exists and is collected into the release package.
+除非每个已声明内置载荷都存在且会被收入发布包，否则失败。
+
+Args:
+    root: Repository root that is about to be packaged.
+    root：即将打包的仓库根目录。
+
+Returns:
+    None when every declared payload is a package member.
+    每个已声明载荷都是包成员时返回空值。
+"""
+def require_bundled_payloads(root: Path) -> None:
+    # PackagedPaths are the exact POSIX member paths collected from the whitelist.
+    # PackagedPaths 是从白名单收集的精确 POSIX 成员路径。
+    packaged_paths = {path.relative_to(root).as_posix() for path in collect_package_paths(root)}
+    # MissingPaths are declared payloads that the archive would not contain.
+    # MissingPaths 是压缩包中不会包含的已声明载荷。
+    missing_paths = [path for path in declared_bundled_paths(root) if path not in packaged_paths]
+    if missing_paths:
+        raise RuntimeError(
+            "Bundled dependency payloads are missing from the package: " + ", ".join(missing_paths)
+        )
+
+
+"""
 Verify that one generated zip exactly matches the formal package whitelist.
 校验生成的 zip 是否与正式包白名单完全一致。
 """
@@ -349,6 +428,11 @@ def parse_args() -> argparse.Namespace:
         help="Generate one source metadata YAML file for non-GitHub distribution channels.",
     )
     parser.add_argument("--version", default=None, help="Semantic version without the leading v.")
+    parser.add_argument(
+        "--require-bundled",
+        action="store_true",
+        help="Fail unless every bundled dependency path declared in dependencies.yaml is packaged; used by the release workflow.",
+    )
     return parser.parse_args()
 
 
@@ -362,6 +446,8 @@ def main() -> int:
     out_dir = (root / args.out_dir).resolve()
     manifest = load_manifest(root)
     version = resolve_version(manifest, args.version)
+    if args.require_bundled:
+        require_bundled_payloads(root)
     package_path, checksum_path = build_package(root, out_dir, version)
     print(f"Package created: {package_path}")
     print(f"Checksums created: {checksum_path}")

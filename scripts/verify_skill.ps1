@@ -17,9 +17,16 @@ $ValidateScript = Join-Path $PSScriptRoot "validate_skill.py"
 # PackageScript is the deterministic release package builder.
 # PackageScript 是确定性的发布包构建脚本。
 $PackageScript = Join-Path $PSScriptRoot "package_skill.py"
-# DebugScript is the repository wrapper around the official debug launcher.
-# DebugScript 是官方调试启动器的仓库封装脚本。
+# DebugScript is the repository wrapper around the official debugger.
+# DebugScript 是官方调试器的仓库封装脚本。
 $DebugScript = Join-Path $PSScriptRoot "debug_skill.ps1"
+# HelloArgsFile contains the deterministic minimal-tool smoke payload.
+# HelloArgsFile 包含确定性的最小工具冒烟参数。
+$HelloArgsFile = Join-Path $ProjectRoot "examples\debug\hello.args.json"
+# >>> demo-only
+# NativeBuildScript builds the bundled native library for this host.
+# NativeBuildScript 为当前主机构建内置原生库。
+$NativeBuildScript = Join-Path $PSScriptRoot "build_native.py"
 # StatusArgsFile contains the deterministic status-tool smoke payload.
 # StatusArgsFile 包含确定性的状态工具冒烟参数。
 $StatusArgsFile = Join-Path $ProjectRoot "examples\debug\demo-status.args.json"
@@ -32,8 +39,18 @@ $OverflowArgsFile = Join-Path $ProjectRoot "examples\debug\overflow-demo.args.js
 # NodeArgsFile contains the deterministic managed Node.js smoke payload.
 # NodeArgsFile 包含确定性的受管 Node.js 冒烟参数。
 $NodeArgsFile = Join-Path $ProjectRoot "examples\debug\node-runtime-demo.args.json"
+# NativeArgsFile contains the deterministic bundled native library payload.
+# NativeArgsFile 包含确定性的内置原生库参数。
+$NativeArgsFile = Join-Path $ProjectRoot "examples\debug\native-demo.args.json"
+# <<< demo-only
 
 Set-Location $ProjectRoot
+# >>> demo-only
+& python $NativeBuildScript
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
+# <<< demo-only
 & python -m unittest discover -s tests -v
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
@@ -50,6 +67,11 @@ if ($LASTEXITCODE -ne 0) {
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
+& powershell -NoProfile -ExecutionPolicy Bypass -File $DebugScript -Command call -Tool hello -ArgsFile $HelloArgsFile -Output json
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
+# >>> demo-only
 & powershell -NoProfile -ExecutionPolicy Bypass -File $DebugScript -Command call -Tool demo-status -ArgsFile $StatusArgsFile -Output json
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
@@ -66,5 +88,10 @@ if ($LASTEXITCODE -ne 0) {
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
+& powershell -NoProfile -ExecutionPolicy Bypass -File $DebugScript -Command call -Tool native-demo -ArgsFile $NativeArgsFile -Output json
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
+# <<< demo-only
 & python $PackageScript
 exit $LASTEXITCODE

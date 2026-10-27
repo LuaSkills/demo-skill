@@ -1,5 +1,5 @@
 name: LuaSkills Demo Skill
-version: 0.2.1
+version: 0.3.0
 enable: true
 debug: false
 config_validator: runtime/config_validator.lua
@@ -75,6 +75,9 @@ help:
     description: Main help node for the LuaSkills/demo-skill repository used in update smoke tests.
     file: help/help.md
   topics:
+    - name: hello
+      description: Explain the minimal hello tool kept by the template cleaner.
+      file: help/hello.md
     - name: demo-status
       description: Explain the runtime diagnostics tool.
       file: help/demo-status.md
@@ -88,9 +91,22 @@ help:
       description: Explain the managed Node.js runtime invocation demo.
       file: help/node-runtime.md
     - name: package-config
-      description: Explain the LuaSkills 0.5.5 package configuration declaration and persisted format.
+      description: Explain the LuaSkills package configuration declaration and persisted format.
       file: help/package-config.md
+    - name: native-library
+      description: Explain the bundled native library dependency and how Lua loads it through FFI.
+      file: help/native-library.md
 entries:
+  - name: hello
+    description: Return one greeting; this is the minimal tool kept by the template cleaner.
+    lua_entry: runtime/hello.lua
+    lua_module: hello
+    help: hello
+    parameters:
+      - name: name
+        type: string
+        description: Optional name greeted by the tool.
+        required: false
   - name: demo-status
     description: Return stable runtime diagnostics for install and lifecycle testing.
     lua_entry: runtime/demo_status.lua
@@ -138,4 +154,18 @@ entries:
       - name: number
         type: integer
         description: Optional integer incremented by the managed Node.js handler.
+        required: false
+  - name: native-demo
+    description: Report the bundled demo-native library path and call it through LuaJIT FFI when it exists.
+    lua_entry: runtime/native_demo.lua
+    lua_module: native_demo
+    help: native-library
+    parameters:
+      - name: a
+        type: integer
+        description: Optional first addend between -1000000000 and 1000000000; defaults to 40.
+        required: false
+      - name: b
+        type: integer
+        description: Optional second addend between -1000000000 and 1000000000; defaults to 2.
         required: false
