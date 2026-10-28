@@ -205,9 +205,9 @@ if [ "$SKIP_MANAGED_NODE_SETUP" != "true" ]; then
   PNPM_VERSION="11.11.0"
   # VerifiedReleaseTag identifies the release whose fetcher digest is pinned below.
   # VerifiedReleaseTag 标识下方固定拉取器摘要对应的发布版本。
-  VERIFIED_RELEASE_TAG="v0.7.1"
-  # ExpectedFetcherHash is the SHA-256 digest of the v0.7.1 shell fetcher.
-  # ExpectedFetcherHash 是 v0.7.1 Shell 拉取脚本的 SHA-256 摘要。
+  VERIFIED_RELEASE_TAG="v0.7.2"
+  # ExpectedFetcherHash is the SHA-256 digest of the v0.7.2 shell fetcher.
+  # ExpectedFetcherHash 是 v0.7.2 Shell 拉取脚本的 SHA-256 摘要。
   EXPECTED_FETCHER_HASH="0e703abdb9445dfcee782010f652ae20f738a87b886e26e01963d50fde59ceeb"
   if [ "$RELEASE_TAG" != "$VERIFIED_RELEASE_TAG" ]; then
     echo "Managed Node.js fetcher checksum is not registered for $RELEASE_TAG. Update the pinned checksum or use --skip-managed-node-setup." >&2

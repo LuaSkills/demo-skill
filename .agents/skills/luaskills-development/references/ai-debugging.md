@@ -36,7 +36,7 @@ Require the setup script to:
 4. Verify SHA-256 before extraction.
 5. Store the complete debugger workspace under the Git-ignored `.luaskills-debug/` directory.
 6. Run the official `setup_runtime` flow to download matching Lua runtime packages.
-7. Download the v0.7.1 managed-runtime fetcher, verify its pinned SHA-256 digest, and install Node.js `24.18.0` with pnpm `11.11.0`.
+7. Download the v0.7.2 managed-runtime fetcher, verify its pinned SHA-256 digest, and install Node.js `24.18.0` with pnpm `11.11.0`.
 
 Use `-Force` or `--force` to rebuild the workspace. When only the debugger binary is needed, pass both `-SkipRuntimeSetup -SkipManagedNodeSetup` or `--skip-runtime-setup --skip-managed-node-setup`.
 
@@ -114,7 +114,7 @@ Read `skill.yaml.entries[].parameters` and the target Lua entry. Confirm require
 
 Distinguish Lua runtime packages, skill-owned `dependencies.yaml`, and host-managed capabilities. Repair only the layer identified by the debugger's real error, and never hard-code dependency paths into source code.
 
-LuaSkills 0.7.1 rejects the whole skill when a bundled payload is missing or the current platform has no package entry, even with `required: false`. Build the host payload with `scripts/build_native.py`; the debug wrapper reports when it drops an unbuilt optional bundled dependency from the stage.
+Since LuaSkills 0.7.2, a `required: false` dependency that cannot be made ready only logs a warning, so the skill still loads; a required one fails the whole skill. When `native-demo` reports `exists: false`, build the host payload with `scripts/build_native.py`.
 
 When a `github_release` download is slow or rate-limited, measure mirrors with `probe-mirrors`, then pass `--github-mirror <id|url>` and `--github-token-env <NAME>` (`-GithubMirror`, `-GithubTokenEnv` on Windows). Pass the name of an environment variable that holds the token, never the token itself.
 

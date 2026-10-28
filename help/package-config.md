@@ -1,6 +1,6 @@
 # package-config
 
-LuaSkills package configuration, introduced in 0.5.5 and unchanged in 0.7.1, belongs to the whole skill package. The top-level `config` block in `skill.yaml` demonstrates `string`, `integer`, `float`, `enum`, and `boolean` declarations, constraints, defaults, sensitive values, and host-facing UI metadata.
+LuaSkills package configuration, introduced in 0.5.5 and unchanged in 0.7.2, belongs to the whole skill package. The top-level `config` block in `skill.yaml` demonstrates `string`, `integer`, `float`, `enum`, and `boolean` declarations, constraints, defaults, sensitive values, and host-facing UI metadata.
 
 `runtime/config_validator.lua` demonstrates isolated cross-field validation: the example rejects a local provider with a temperature above `1.0`.
 

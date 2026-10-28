@@ -105,9 +105,9 @@ $ProjectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 # DebugRoot is the ignored standalone debug workspace.
 # DebugRoot 是被忽略的独立调试工作区。
 $DebugRoot = Join-Path $ProjectRoot ".luaskills-debug"
-# BinaryPath is the official debugger executable. The v0.7.1 package launchers forward only the classic flags,
+# BinaryPath is the official debugger executable. The v0.7.2 package launchers forward only the classic flags,
 # so the wrapper calls the executable directly to reach --github-mirror, --github-token-env, and probe-mirrors.
-# BinaryPath 是官方调试器可执行文件。v0.7.1 包内启动器只转发传统参数，
+# BinaryPath 是官方调试器可执行文件。v0.7.2 包内启动器只转发传统参数，
 # 因此封装脚本直接调用可执行文件，以支持 --github-mirror、--github-token-env 与 probe-mirrors。
 $BinaryPath = Join-Path $DebugRoot "bin\luaskills-debug.exe"
 # RuntimeRoot is the package-local runtime used by every official debugger command.

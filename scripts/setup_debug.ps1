@@ -300,9 +300,9 @@ function Install-ManagedNodeRuntime {
     $PnpmVersion = "11.11.0"
     # VerifiedReleaseTag identifies the release whose fetcher digest is pinned below.
     # VerifiedReleaseTag 标识下方固定拉取器摘要对应的发布版本。
-    $VerifiedReleaseTag = "v0.7.1"
-    # ExpectedFetcherHash is the SHA-256 digest of the v0.7.1 PowerShell fetcher.
-    # ExpectedFetcherHash 是 v0.7.1 PowerShell 拉取脚本的 SHA-256 摘要。
+    $VerifiedReleaseTag = "v0.7.2"
+    # ExpectedFetcherHash is the SHA-256 digest of the v0.7.2 PowerShell fetcher.
+    # ExpectedFetcherHash 是 v0.7.2 PowerShell 拉取脚本的 SHA-256 摘要。
     $ExpectedFetcherHash = "089bd33fe6ebfb949651e6bd6f782350eef1b31c9ae9e229c1e992b82ab5f2c6"
     if ($ReleaseTag -ne $VerifiedReleaseTag) {
         throw "Managed Node.js fetcher checksum is not registered for $ReleaseTag. Update the pinned checksum or use -SkipManagedNodeSetup."

@@ -1,5 +1,5 @@
 name: LuaSkills Demo Skill
-version: 0.3.0
+version: 0.3.1
 enable: true
 debug: false
 config_validator: runtime/config_validator.lua

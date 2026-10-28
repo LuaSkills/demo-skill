@@ -4,10 +4,10 @@
 
 这是一个可直接 Fork 的完整 LuaSkill 仓库模板。它提供正式 skill 示例、AI 开发技能、经过校验的官方 `luaskills-debug` 环境拉取、真实引擎调用、本地验证打包、按平台构建的内置原生库和 GitHub Actions 发布流程。
 
-当前模板对齐的 LuaSkills 正式版本是 **v0.7.1**，[`.luaskills-version`](.luaskills-version) 是调试器与文档的唯一版本基线。技能包版本由 `skill.yaml` 声明；两种版本用途不同，不要求保持一致。
+当前模板对齐的 LuaSkills 正式版本是 **v0.7.2**，[`.luaskills-version`](.luaskills-version) 是调试器与文档的唯一版本基线。技能包版本由 `skill.yaml` 声明；两种版本用途不同，不要求保持一致。
 
 <!-- >>> demo-only -->
-当前演示 skill 版本为 `0.3.0`。运行[模板清理脚本](#从最小模板开始)可删除全部演示，只保留一个最小的 `hello` 工具。
+当前演示 skill 版本为 `0.3.1`。运行[模板清理脚本](#从最小模板开始)可删除全部演示，只保留一个最小的 `hello` 工具。
 <!-- <<< demo-only -->
 
 ## Fork 后直接交给 AI
@@ -60,7 +60,7 @@ luaskills-debug-tool-{platform}.tar.gz.sha256
 bash ./scripts/setup_debug.sh --force
 ```
 
-初始化还会下载 v0.7.1 标签下的官方 `fetch_managed_runtimes.*`，验证固定 SHA-256 后才执行。上游脚本使用 Node.js 官方 `SHASUMS256.txt` 和 npm integrity 元数据校验 Node.js 与 pnpm。仅检查调试器本体时可跳过两类运行时：
+初始化还会下载 v0.7.2 标签下的官方 `fetch_managed_runtimes.*`，验证固定 SHA-256 后才执行。上游脚本使用 Node.js 官方 `SHASUMS256.txt` 和 npm integrity 元数据校验 Node.js 与 pnpm。仅检查调试器本体时可跳过两类运行时：
 
 ```powershell
 .\scripts\setup_debug.ps1 -SkipRuntimeSetup -SkipManagedNodeSetup
@@ -70,7 +70,7 @@ bash ./scripts/setup_debug.sh --force
 bash ./scripts/setup_debug.sh --skip-runtime-setup --skip-managed-node-setup
 ```
 
-v0.7.1 的 Linux 调试工具压缩包还在 `bin/luaskills-debug.asc` 附带分离式 OpenPGP 签名。初始化脚本只校验 SHA-256；如需同时校验签名，请导入 LuaSkills 发布密钥（LuaSkills 仓库同一标签下的 `scripts/release/release-gpg-public.asc`），然后执行：
+v0.7.2 的 Linux 调试工具压缩包还在 `bin/luaskills-debug.asc` 附带分离式 OpenPGP 签名。初始化脚本只校验 SHA-256；如需同时校验签名，请导入 LuaSkills 发布密钥（LuaSkills 仓库同一标签下的 `scripts/release/release-gpg-public.asc`），然后执行：
 
 ```bash
 gpg --verify .luaskills-debug/bin/luaskills-debug.asc .luaskills-debug/bin/luaskills-debug
@@ -78,7 +78,7 @@ gpg --verify .luaskills-debug/bin/luaskills-debug.asc .luaskills-debug/bin/luask
 
 ## 调试当前 Skill
 
-调试封装使用与正式宿主相同的加载和调用链路。它只把发布白名单源码暂存到 `.luaskills-debug/source/<skill-id>/`，再同步到隔离的 runtime root；`.git/`、下载工具、AI 提示、测试和构建脚本不会被递归复制到运行环境。由于 v0.7.1 调试包内的启动器只转发传统参数，封装脚本会直接调用 `.luaskills-debug/bin/luaskills-debug`。
+调试封装使用与正式宿主相同的加载和调用链路。它只把发布白名单源码暂存到 `.luaskills-debug/source/<skill-id>/`，再同步到隔离的 runtime root；`.git/`、下载工具、AI 提示、测试和构建脚本不会被递归复制到运行环境。由于 v0.7.2 调试包内的启动器只转发传统参数，封装脚本会直接调用 `.luaskills-debug/bin/luaskills-debug`。
 
 每条调试命令都通过仓库级互斥锁串行化环境初始化、白名单暂存、同步与调用。多个 AI 任务或终端可以并发发起命令，而不会互相删除暂存文件。
 
@@ -130,7 +130,7 @@ bash ./scripts/debug_skill.sh call --tool native-demo --args-file ./examples/deb
 
 使用 `source.type: github_release` 声明的依赖由调试器在准备 skill 时下载。`sync`、`inspect`、`list-tools` 与 `call` 支持两个控制下载的选项：
 
-- `--github-mirror <id|url>`（Windows 为 `-GithubMirror`）：通过内置镜像标识或镜像地址下载 Release 资产。v0.7.1 的内置标识为 `github`、`gh-proxy-com`、`ghfast-top`、`gh-llkk-cc`、`ghproxy-net`。
+- `--github-mirror <id|url>`（Windows 为 `-GithubMirror`）：通过内置镜像标识或镜像地址下载 Release 资产。v0.7.2 的内置标识为 `github`、`gh-proxy-com`、`ghfast-top`、`gh-llkk-cc`、`ghproxy-net`。
 - `--github-token-env <NAME>`（Windows 为 `-GithubTokenEnv`）：从指定环境变量读取 GitHub 令牌。令牌只发送给 `api.github.com`，用于解除匿名 API 限流。这里传入的是变量名，绝不是令牌本身。
 
 这两个选项不影响 `setup_debug` 下载调试器的方式，后者始终使用官方 Release 地址。
@@ -183,10 +183,10 @@ python3 ./scripts/build_native.py
 
 构建产物命中 `.gitignore` 中的 `*.dll`、`*.so` 与 `*.dylib` 规则，因此不会进入提交；但 `native/` 目录属于打包白名单，因此会进入 skill zip。
 
-该依赖声明了 `required: false`，但 LuaSkills 0.7.1 不会对内置载荷应用这个标记：当前平台没有包条目或声明的文件缺失时，整个 skill 都会加载失败。仓库在两处处理这一点：
+该依赖声明了 `required: false`。自 LuaSkills 0.7.2 起，无法就绪的可选依赖（载荷缺失、当前平台没有包条目或下载失败）只记录警告，skill 照常加载。因此：
 
-- 发布工作流在原生 Runner 上构建全部五个平台，并使用 `--require-bundled` 打包，因此每个发布 zip 都包含全部载荷。没有条目的 `windows-arm64` 宿主无法加载本演示；面向该平台前需要补充第六个包。
-- 当当前主机的载荷尚未构建时，调试封装会从暂存副本中移除该可选内置依赖并输出提示。因此没有 C 编译器的机器仍可调试其他工具，`native-demo` 会报告 `exists: false`，与 `rg-check` 报告缺失 `rg` 的方式一致。
+- 发布工作流在原生 Runner 上构建全部五个平台，并使用 `--require-bundled` 打包，因此每个发布 zip 都包含全部载荷。
+- 没有条目的 `windows-arm64` 宿主，或尚未运行 `build_native.py` 的调试机器，仍可使用其他全部工具，`native-demo` 会报告 `exists: false`，与 `rg-check` 报告缺失 `rg` 的方式一致。
 
 LuaSkills 会复用同版本的已安装依赖。修改 C 源码后，请同时提升 `dependencies.yaml` 与 `runtime/native_demo.lua` 中的依赖版本，或在下次调试前删除 `.luaskills-debug/runtime/dependencies/ffi/<skill-id>/demo-native/`。
 <!-- <<< demo-only -->
@@ -194,13 +194,13 @@ LuaSkills 会复用同版本的已安装依赖。修改 C 源码后，请同时�
 <!-- >>> demo-only -->
 ## LuaSkills 技能包配置示例
 
-`skill.yaml` 顶层的 `config` 块演示包级共享配置，并覆盖五种受支持类型：`string`、`integer`、`float`、`enum` 与 `boolean`。示例同时包含约束、默认值、必填敏感值、标题、分组、顺序、格式、重启提示、高级标记和枚举元数据。该契约由 LuaSkills 0.5.5 引入，在 v0.7.1 中保持不变。
+`skill.yaml` 顶层的 `config` 块演示包级共享配置，并覆盖五种受支持类型：`string`、`integer`、`float`、`enum` 与 `boolean`。示例同时包含约束、默认值、必填敏感值、标题、分组、顺序、格式、重启提示、高级标记和枚举元数据。该契约由 LuaSkills 0.5.5 引入，在 v0.7.2 中保持不变。
 
 `runtime/config_validator.lua` 演示隔离的跨字段校验。`resources/skill-config.example.json` 展示唯一受支持的持久化文档形状，包括 `format_version`、十进制字符串 `revision` 和按包标识组织的 `skills` 对象。仓库内示例有意不保存必填敏感项 `api_token`。
 
 嵌入宿主必须显式提供一个绝对、可写、用户级的 `skill_config_root`。普通技能包配置存储在 `<skill_config_root>/skills/config.json`；技能包 Lua 只能通过 `vulcan.config.*` 访问自身命名空间，跨包管理权限由宿主负责。
 
-v0.7.1 独立版 `luaskills-debug` CLI 会在 `inspect` 阶段校验配置声明与 `config_validator` 路径，但尚未暴露 `skill_config_root` 参数；校验器本身只会在配置事务中执行。因此本仓库调试流程会真实校验技能包契约，不伪造配置写入；需要验证 `runtime-config` 读写与跨字段校验时，应使用已配置 `skill_config_root` 的宿主或 SDK。
+v0.7.2 独立版 `luaskills-debug` CLI 会在 `inspect` 阶段校验配置声明与 `config_validator` 路径，但尚未暴露 `skill_config_root` 参数；校验器本身只会在配置事务中执行。因此本仓库调试流程会真实校验技能包契约，不伪造配置写入；需要验证 `runtime-config` 读写与跨字段校验时，应使用已配置 `skill_config_root` 的宿主或 SDK。
 <!-- <<< demo-only -->
 
 ## 一键验证并生成发布包
@@ -281,7 +281,7 @@ bash ./scripts/tag_release.sh <version>
 ```
 
 <!-- >>> demo-only -->
-本演示当前版本为 `0.3.0`。
+本演示当前版本为 `0.3.1`。
 <!-- <<< demo-only -->
 
 ## 从最小模板开始
@@ -333,9 +333,9 @@ bash ./scripts/clean_to_template.sh --yes
 
 实现与真实流程测试通过后，AI 必须循环审核代码、清单、下载校验、跨平台脚本、打包白名单、Action 与文档。发现任何问题都必须立即修复、完整复测并把连续通过计数清零。只有连续五次完整审核均未发现问题，才能结束或发布。
 
-以 LuaSkills v0.7.1 官方文档作为协议依据：
+以 LuaSkills v0.7.2 官方文档作为协议依据：
 
-- [Lua Skill Development Manual](https://github.com/LuaSkills/luaskills/blob/v0.7.1/docs/development/skill-development.md)
-- [Lua Skill 开发手册（简体中文）](https://github.com/LuaSkills/luaskills/blob/v0.7.1/docs/zh-CN/development/skill-development.md)
-- [技能包配置宿主契约](https://github.com/LuaSkills/luaskills/blob/v0.7.1/docs/integration/package-configuration.md)
-- [LuaSkills v0.7.1 Release](https://github.com/LuaSkills/luaskills/releases/tag/v0.7.1)
+- [Lua Skill Development Manual](https://github.com/LuaSkills/luaskills/blob/v0.7.2/docs/development/skill-development.md)
+- [Lua Skill 开发手册（简体中文）](https://github.com/LuaSkills/luaskills/blob/v0.7.2/docs/zh-CN/development/skill-development.md)
+- [技能包配置宿主契约](https://github.com/LuaSkills/luaskills/blob/v0.7.2/docs/integration/package-configuration.md)
+- [LuaSkills v0.7.2 Release](https://github.com/LuaSkills/luaskills/releases/tag/v0.7.2)

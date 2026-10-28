@@ -101,9 +101,9 @@ acquire_debug_lock
 # Setup 在每个调试命令前于仓库锁内幂等执行。
 bash "$PROJECT_ROOT/scripts/setup_debug.sh"
 
-# BinaryPath is the official debugger executable. The v0.7.1 package launcher forwards only the classic flags,
+# BinaryPath is the official debugger executable. The v0.7.2 package launcher forwards only the classic flags,
 # so the wrapper calls the executable directly and every option after the command passes through unchanged.
-# BinaryPath 是官方调试器可执行文件。v0.7.1 包内启动器只转发传统参数，
+# BinaryPath 是官方调试器可执行文件。v0.7.2 包内启动器只转发传统参数，
 # 因此封装脚本直接调用可执行文件，命令之后的所有选项原样透传。
 BINARY_PATH="$DEBUG_ROOT/bin/luaskills-debug"
 # RuntimeRoot is the package-local runtime used by every official debugger command.

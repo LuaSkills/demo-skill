@@ -13,8 +13,7 @@ How LuaSkills installs it:
 
 - The payload is copied from the skill directory into `vulcan.deps.ffi_path/demo-native/1.0.0/<platform>/lib/`, with no network access.
 - An existing installation of the same version is reused; bump the dependency version when the library changes.
-- LuaSkills 0.7.1 refuses to load the whole skill when the current platform has no package entry or the declared payload file is missing, even for `required: false`. Release packages therefore ship every declared platform, and `windows-arm64` hosts cannot load this demo.
-- The repository debug wrapper drops an optional bundled entry whose host payload was not built, so a machine without a C compiler can still debug the other tools.
+- The dependency is `required: false`. Since LuaSkills 0.7.2, when the current platform has no package entry, such as `windows-arm64`, or the payload file is missing, the runtime logs a warning and loads the skill without it; `native-demo` then reports `exists: false`.
 
 Use `native-demo` to verify:
 
