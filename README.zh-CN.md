@@ -292,7 +292,7 @@ schemas/
 仓库包含两个可直接复用的工作流：
 
 - **Validate and Package LuaSkill**：Pull Request 或手动触发时运行 `verify_skill.sh`，下载调试器与运行时，加载 skill、枚举工具、执行真实调用、校验并打包，然后在 `dist/*` 存在时将其上传为 `<仓库名>-verified-package`。
-- **Release LuaSkill**：推送 `v*` 标签时，以所选 `layout` 和 `expect-tag: ${{ github.ref_name }}` 运行 `LuaSkills/luaskills-debug@v0.8.0` Action。该 Action 校验 skill，在标签与 `skill.yaml.version` 不一致或内置载荷缺失时失败，并写出发布资产与 checksum 文件；随后 `gh release create` 上传全部资产。发布任务不再重跑调试流程，发布脚本会在推送标签前执行它。
+- **Release LuaSkill**：推送 `v*` 标签时，以所选 `layout` 和 `expect-tag: ${{ github.ref_name }}` 运行 `LuaSkills/luaskills-debug@v0.8.1` Action。该 Action 校验 skill，在标签与 `skill.yaml.version` 不一致或内置载荷缺失时失败，并写出发布资产与 checksum 文件；随后 `gh release create` 上传全部资产。发布任务不再重跑调试流程，发布脚本会在推送标签前执行它。
 
 LuaSkills Hub 只从 GitHub Release 导入 skill。skill 会绑定到首次发布它的 GitHub 仓库。
 

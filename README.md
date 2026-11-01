@@ -292,7 +292,7 @@ schemas/
 The repository contains two reusable workflows:
 
 - **Validate and Package LuaSkill**: on pull requests or manual dispatch, runs `verify_skill.sh`, which downloads the debugger and runtimes, loads the skill, enumerates tools, performs real invocations, validates, and packages, then uploads `dist/*` as `<repository-name>-verified-package` when it exists.
-- **Release LuaSkill**: on a `v*` tag, runs the `LuaSkills/luaskills-debug@v0.8.0` action with the selected `layout` and `expect-tag: ${{ github.ref_name }}`. The action validates the skill, fails when the tag differs from `skill.yaml.version` or a bundled payload is missing, and writes the release assets with the checksums file. `gh release create` then uploads every asset. The release job does not rerun the debug flow; the release script runs it before pushing the tag.
+- **Release LuaSkill**: on a `v*` tag, runs the `LuaSkills/luaskills-debug@v0.8.1` action with the selected `layout` and `expect-tag: ${{ github.ref_name }}`. The action validates the skill, fails when the tag differs from `skill.yaml.version` or a bundled payload is missing, and writes the release assets with the checksums file. `gh release create` then uploads every asset. The release job does not rerun the debug flow; the release script runs it before pushing the tag.
 
 LuaSkills Hub imports skills only from GitHub Releases. A skill is bound to the first GitHub repository it is published from.
 

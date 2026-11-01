@@ -93,7 +93,7 @@ jobs:
       # 该 Action 校验技能，内置载荷缺失或标签与 skill.yaml 不一致时失败，并写出带校验和的发布资产。
       - name: Validate and package the skill
         id: package
-        uses: LuaSkills/luaskills-debug@v0.8.0
+        uses: LuaSkills/luaskills-debug@v0.8.1
         with:
           layout: ${{ env.LUASKILLS_PACKAGE_LAYOUT }}
           expect-tag: ${{ github.ref_name }}
