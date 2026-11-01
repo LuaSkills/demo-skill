@@ -176,7 +176,10 @@ try {
         }
     }
     if ($Command -eq "package") {
-        $ForwardedArgs += @("--out-dir", $OutDir, "--layout", $Layout)
+        # ResolvedOutDir anchors a relative -OutDir to the repository root, matching debug_skill.sh.
+        # ResolvedOutDir 将相对 -OutDir 锚定到仓库根目录，与 debug_skill.sh 一致。
+        $ResolvedOutDir = if ([System.IO.Path]::IsPathRooted($OutDir)) { $OutDir } else { Join-Path $ProjectRoot $OutDir }
+        $ForwardedArgs += @("--out-dir", $ResolvedOutDir, "--layout", $Layout)
         if ($NoUniversal) {
             $ForwardedArgs += "--no-universal"
         }
