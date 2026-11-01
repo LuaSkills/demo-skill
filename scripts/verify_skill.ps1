@@ -1,7 +1,7 @@
 ﻿<#
 .SYNOPSIS
-Validate, load, enumerate, and package the current LuaSkill in one command.
-用一个命令校验、加载、枚举并打包当前 LuaSkill。
+Load, call, validate, and package the current LuaSkill in one command.
+用一个命令加载、调用、校验并打包当前 LuaSkill。
 #>
 
 # ErrorActionPreference stops the one-click verification at the first failed stage.
@@ -11,18 +11,15 @@ $ErrorActionPreference = "Stop"
 # ProjectRoot is the repository and skill package root.
 # ProjectRoot 是仓库与 skill 包根目录。
 $ProjectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
-# ValidateScript is the repository structure validator.
-# ValidateScript 是仓库结构校验脚本。
-$ValidateScript = Join-Path $PSScriptRoot "validate_skill.py"
-# PackageScript is the deterministic release package builder.
-# PackageScript 是确定性的发布包构建脚本。
-$PackageScript = Join-Path $PSScriptRoot "package_skill.py"
-# DebugScript is the repository wrapper around the official debugger.
-# DebugScript 是官方调试器的仓库封装脚本。
+# DebugScript is the repository wrapper around luaskills-debug.
+# DebugScript 是 luaskills-debug 的仓库封装脚本。
 $DebugScript = Join-Path $PSScriptRoot "debug_skill.ps1"
 # HelloArgsFile contains the deterministic minimal-tool smoke payload.
 # HelloArgsFile 包含确定性的最小工具冒烟参数。
 $HelloArgsFile = Join-Path $ProjectRoot "examples\debug\hello.args.json"
+# PackageRelease runs validate and package, which need every bundled payload dependencies.yaml declares.
+# PackageRelease 执行 validate 与 package，二者需要 dependencies.yaml 声明的每个内置载荷。
+$PackageRelease = $true
 # >>> demo-only
 # NativeBuildScript builds the bundled native library for this host.
 # NativeBuildScript 为当前主机构建内置原生库。
@@ -42,6 +39,10 @@ $NodeArgsFile = Join-Path $ProjectRoot "examples\debug\node-runtime-demo.args.js
 # NativeArgsFile contains the deterministic bundled native library payload.
 # NativeArgsFile 包含确定性的内置原生库参数。
 $NativeArgsFile = Join-Path $ProjectRoot "examples\debug\native-demo.args.json"
+# The demo declares native libraries for five systems but builds only this host's; the release workflow validates
+# and packages after all five builds.
+# 演示声明了五个系统的原生库，但本地只构建当前主机的一份；发布 workflow 在五个构建完成后校验并打包。
+$PackageRelease = $false
 # <<< demo-only
 
 Set-Location $ProjectRoot
@@ -52,10 +53,6 @@ if ($LASTEXITCODE -ne 0) {
 }
 # <<< demo-only
 & python -m unittest discover -s tests -v
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
-}
-& python $ValidateScript
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
@@ -93,5 +90,13 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 # <<< demo-only
-& python $PackageScript
+if (-not $PackageRelease) {
+    Write-Host "Skipping validate and package: the release workflow runs them after every bundled payload is built."
+    exit 0
+}
+& powershell -NoProfile -ExecutionPolicy Bypass -File $DebugScript -Command validate
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
+& powershell -NoProfile -ExecutionPolicy Bypass -File $DebugScript -Command package
 exit $LASTEXITCODE

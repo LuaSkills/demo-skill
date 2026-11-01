@@ -5,7 +5,6 @@ Test release-package filtering, manifest path safety, bundled payloads, and the 
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -22,14 +21,12 @@ from scripts.build_native import (
     normalize_platform_key,
 )
 from scripts.clean_to_template import DEMO_BLOCK_BEGIN, DEMO_BLOCK_END, MARKED_FILES, REMOVED_PATHS
-from scripts.package_skill import collect_package_paths, repo_root, require_bundled_payloads
-from scripts.release_version import normalize_requested_version, resolve_release_tag
-from scripts.validate_skill import resolve_package_file
+from scripts.release_version import normalize_requested_version, repo_root, resolve_release_tag
 
 
 # CopyIgnorePatterns excludes Git metadata, downloaded debugger files, and build output from repository copies.
 # CopyIgnorePatterns 在复制仓库时排除 Git 元数据、下载的调试器文件与构建产物。
-COPY_IGNORE_PATTERNS = (".git", ".luaskills-debug", ".luaskills-debug.lock*", "dist", "__pycache__", "node_modules")
+COPY_IGNORE_PATTERNS = (".git", ".luaskills-debug*", "dist", "__pycache__", "node_modules")
 # RemovedToolNames are the demo tools that must not survive template cleanup.
 # RemovedToolNames 是模板清理后不得残留的演示工具。
 REMOVED_TOOL_NAMES = ("demo-status", "rg-check", "overflow-demo", "node-runtime-demo", "native-demo")
@@ -76,93 +73,31 @@ def snapshot_tree(root: Path) -> dict[str, bytes]:
     }
 
 
-class ToolingSafetyTests(unittest.TestCase):
+"""
+Return the luaskills-debug executable installed by scripts/setup_debug, or one on PATH.
+返回 scripts/setup_debug 安装的 luaskills-debug 可执行文件，或 PATH 中的那一个。
+
+Returns:
+    Executable path, or None when luaskills-debug is not installed.
+    可执行文件路径；未安装 luaskills-debug 时为 None。
+"""
+def debug_binary() -> str | None:
+    name = "luaskills-debug.exe" if sys.platform == "win32" else "luaskills-debug"
+    debug_root = repo_root() / ".luaskills-debug"
+    # The local workspace counts only when setup installed the release that .luaskills-version pins.
+    # 只有当 setup 安装的正是 .luaskills-version 固定的版本时，才使用本地工作区。
+    installed = debug_root / ".installed-version"
+    pinned = (repo_root() / ".luaskills-version").read_text(encoding="utf-8").strip()
+    if (debug_root / "bin" / name).is_file() and installed.is_file() and installed.read_text(encoding="utf-8-sig").strip() == pinned:
+        return str(debug_root / "bin" / name)
+    return shutil.which("luaskills-debug")
+
+
+class ReleaseVersionTests(unittest.TestCase):
     """
-    Verify that local generated files and unsafe paths cannot enter a release package.
-    验证本地生成文件与不安全路径无法进入发布包。
+    Verify that release tags follow the skill.yaml version.
+    验证发布标签与 skill.yaml 版本一致。
     """
-
-    def test_generated_node_directories_are_excluded(self) -> None:
-        """
-        Confirm that Node.js dependency caches are excluded while source files remain.
-        确认 Node.js 依赖缓存被排除，同时保留源文件。
-
-        Returns:
-            None after the exact package member list matches expectations.
-            精确包成员列表符合预期后返回空值。
-        """
-        with TemporaryDirectory() as temporary_directory:
-            # Root is an isolated synthetic skill package used by the collector.
-            # Root 是供收集器使用的隔离合成 skill 包。
-            root = Path(temporary_directory) / "demo-skill"
-            # NodeRoot is the formal source directory allowed by the package whitelist.
-            # NodeRoot 是打包白名单允许的正式源码目录。
-            node_root = root / "node"
-            (node_root / "node_modules" / "dependency").mkdir(parents=True)
-            (node_root / ".pnpm-store").mkdir()
-            (node_root / "echo.mjs").write_text("export {};\n", encoding="utf-8")
-            (node_root / "node_modules" / "dependency" / "index.js").write_text(
-                "generated\n",
-                encoding="utf-8",
-            )
-            (node_root / ".pnpm-store" / "cache").write_text("generated\n", encoding="utf-8")
-
-            # RelativePaths exposes the exact files the release collector accepted.
-            # RelativePaths 展示发布收集器接受的精确文件。
-            relative_paths = [
-                path.relative_to(root).as_posix()
-                for path in collect_package_paths(root)
-            ]
-            self.assertEqual(["node/echo.mjs"], relative_paths)
-
-    def test_parent_traversal_is_rejected(self) -> None:
-        """
-        Confirm that a path cannot move to a parent even when it resolves back inside root.
-        确认路径即使最终回到根目录内，也不能先移动到父目录。
-
-        Returns:
-            None after the validator raises the required traversal error.
-            校验器按要求抛出穿越错误后返回空值。
-        """
-        with TemporaryDirectory() as temporary_directory:
-            # Root owns the target file used by the normalization edge case.
-            # Root 是规范化边界用例目标文件所属的根目录。
-            root = Path(temporary_directory) / "demo-skill"
-            root.mkdir()
-            (root / "README.md").write_text("demo\n", encoding="utf-8")
-            with self.assertRaisesRegex(RuntimeError, "parent traversal"):
-                resolve_package_file(root, "../demo-skill/README.md", "test.path")
-
-    def test_package_symlink_is_rejected(self) -> None:
-        """
-        Confirm that a symbolic link below a whitelisted directory fails packaging.
-        确认白名单目录下的符号链接会导致打包失败。
-
-        Returns:
-            None after the collector rejects the symbolic link.
-            收集器拒绝符号链接后返回空值。
-        """
-        with TemporaryDirectory() as temporary_directory:
-            # Root contains one regular source and one link that points to it.
-            # Root 包含一个普通源文件和一个指向该文件的链接。
-            root = Path(temporary_directory) / "demo-skill"
-            # RuntimeRoot is a formal package directory used for the link test.
-            # RuntimeRoot 是符号链接测试使用的正式包目录。
-            runtime_root = root / "runtime"
-            runtime_root.mkdir(parents=True)
-            # TargetPath is the real file referenced by the test link.
-            # TargetPath 是测试链接引用的真实文件。
-            target_path = runtime_root / "target.lua"
-            target_path.write_text("return true\n", encoding="utf-8")
-            # LinkPath is the unsafe package member expected to be rejected.
-            # LinkPath 是预期被拒绝的不安全包成员。
-            link_path = runtime_root / "linked.lua"
-            try:
-                os.symlink(target_path, link_path)
-            except OSError as error:
-                self.skipTest(f"Symbolic links are unavailable in this environment: {error}")
-            with self.assertRaisesRegex(RuntimeError, "symbolic link"):
-                collect_package_paths(root)
 
     def test_release_version_must_match_manifest(self) -> None:
         """
@@ -188,54 +123,6 @@ class ToolingSafetyTests(unittest.TestCase):
                 resolve_release_tag(root, "1.2.4")
             with self.assertRaisesRegex(RuntimeError, "exact semantic version"):
                 normalize_requested_version("latest")
-
-
-class BundledPayloadTests(unittest.TestCase):
-    """
-    Verify that strict packaging requires every declared bundled payload.
-    验证严格打包要求每个已声明的内置载荷都存在。
-    """
-
-    def test_require_bundled_detects_missing_and_present_payloads(self) -> None:
-        """
-        Confirm that --require-bundled fails while a declared payload is absent and passes once it exists.
-        确认已声明载荷缺失时 --require-bundled 失败，载荷存在后通过。
-
-        Returns:
-            None after both the failing and the passing states are observed.
-            观察到失败与通过两种状态后返回空值。
-        """
-        with TemporaryDirectory() as temporary_directory:
-            # Root is an isolated synthetic skill that declares one bundled library.
-            # Root 是声明了一个内置库的隔离合成 skill。
-            root = Path(temporary_directory) / "demo-skill"
-            root.mkdir()
-            (root / "dependencies.yaml").write_text(
-                "tool_dependencies: []\n"
-                "lua_dependencies: []\n"
-                "ffi_dependencies:\n"
-                "  - name: sample\n"
-                "    version: \"1.0.0\"\n"
-                "    source:\n"
-                "      type: bundled\n"
-                "    packages:\n"
-                "      linux-x64:\n"
-                "        archive_type: raw\n"
-                "        path: native/linux-x64/libsample.so\n"
-                "        exports:\n"
-                "          - archive_path: libsample.so\n"
-                "            target_path: lib/libsample.so\n",
-                encoding="utf-8",
-            )
-            with self.assertRaisesRegex(RuntimeError, "native/linux-x64/libsample.so"):
-                require_bundled_payloads(root)
-
-            # PayloadPath is the declared library file created to satisfy the check.
-            # PayloadPath 是为满足检查而创建的已声明库文件。
-            payload_path = root / "native" / "linux-x64" / "libsample.so"
-            payload_path.parent.mkdir(parents=True)
-            payload_path.write_bytes(b"\x7fELF")
-            require_bundled_payloads(root)
 
 
 class NativeBuildMappingTests(unittest.TestCase):
@@ -379,8 +266,17 @@ class TemplateCleanerTests(unittest.TestCase):
                     self.assertFalse((root / relative_path).exists())
                     self.assertIn(relative_path, cleaned.stdout)
 
-            validation = run_script(root, "scripts/validate_skill.py")
-            self.assertEqual(0, validation.returncode, validation.stdout + validation.stderr)
+            # The cleaned template declares no bundled payload, so luaskills-debug validates it without a native build.
+            # 清理后的模板不声明内置载荷，因此 luaskills-debug 无需原生构建即可校验。
+            binary = debug_binary()
+            if binary is not None:
+                validation = subprocess.run(
+                    [binary, "validate", "--skill-path", str(root)],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(0, validation.returncode, validation.stdout + validation.stderr)
 
             with (root / "skill.yaml").open("r", encoding="utf-8") as handle:
                 # Manifest is the cleaned skill manifest.

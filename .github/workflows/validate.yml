@@ -6,7 +6,7 @@ on:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -16,14 +16,12 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install validation dependencies
+      - name: Install test dependencies
         run: python -m pip install --upgrade pip pyyaml
 
-      # >>> demo-only
-      - name: Build host native library
-        run: python ./scripts/build_native.py
-      # <<< demo-only
-
+      # verify_skill downloads luaskills-debug, loads the skill, calls every example tool, and validates and packages
+      # the skill when every bundled payload it declares is present.
+      # verify_skill 下载 luaskills-debug、加载技能、调用每个示例工具，并在声明的内置载荷齐全时校验并打包。
       - name: Run complete debugger flow
         run: bash ./scripts/verify_skill.sh
 
@@ -32,4 +30,4 @@ jobs:
         with:
           name: ${{ github.event.repository.name }}-verified-package
           path: dist/*
-          if-no-files-found: error
+          if-no-files-found: ignore

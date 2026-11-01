@@ -1,11 +1,11 @@
 ﻿<#
 .SYNOPSIS
-Download, verify, and initialize the pinned LuaSkills debug workspace.
-下载、校验并初始化固定版本的 LuaSkills 调试工作区。
+Download, verify, and initialize the pinned luaskills-debug workspace.
+下载、校验并初始化固定版本的 luaskills-debug 工作区。
 
 .PARAMETER Version
-Optional LuaSkills release tag that overrides .luaskills-version.
-可选的 LuaSkills 发布标签，用于覆盖 .luaskills-version。
+Optional luaskills-debug release tag that overrides .luaskills-version.
+可选的 luaskills-debug 发布标签，用于覆盖 .luaskills-version。
 
 .PARAMETER SkipRuntimeSetup
 Skip downloading Lua runtime packages after extracting the debug tool.
@@ -114,7 +114,7 @@ function Get-WindowsPlatformKey {
     # Architecture 是当前 PowerShell 进程架构。
     $Architecture = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant()
     if ($Architecture -ne "x64") {
-        throw "The official LuaSkills release does not provide a Windows debug asset for architecture '$Architecture'."
+        throw "luaskills-debug does not provide a Windows release for architecture '$Architecture'."
     }
     return "windows-x64"
 }
@@ -276,21 +276,14 @@ function Test-InstalledVersion {
 function Install-ManagedNodeRuntime {
     <#
     .SYNOPSIS
-    Download the pinned official managed-runtime fetcher and install Node.js plus pnpm.
-    下载固定版本的官方受管运行时拉取器，并安装 Node.js 与 pnpm。
+    Install Node.js plus pnpm with the managed-runtime fetcher shipped in the verified debug archive.
+    使用已校验调试压缩包内附带的受管运行时拉取器安装 Node.js 与 pnpm。
 
     .PARAMETER DebugRoot
     Absolute ignored LuaSkills debug workspace path.
     被忽略的 LuaSkills 调试工作区绝对路径。
-
-    .PARAMETER ReleaseTag
-    LuaSkills release tag that owns the verified fetcher script.
-    提供已校验拉取脚本的 LuaSkills 发布标签。
     #>
-    param(
-        [string]$DebugRoot,
-        [string]$ReleaseTag
-    )
+    param([string]$DebugRoot)
 
     # NodeVersion is the exact managed Node.js version declared by dependencies.yaml.
     # NodeVersion 是 dependencies.yaml 声明的精确受管 Node.js 版本。
@@ -298,16 +291,6 @@ function Install-ManagedNodeRuntime {
     # PnpmVersion is the exact managed package-manager version declared by dependencies.yaml.
     # PnpmVersion 是 dependencies.yaml 声明的精确受管包管理器版本。
     $PnpmVersion = "11.11.0"
-    # VerifiedReleaseTag identifies the release whose fetcher digest is pinned below.
-    # VerifiedReleaseTag 标识下方固定拉取器摘要对应的发布版本。
-    $VerifiedReleaseTag = "v0.7.2"
-    # ExpectedFetcherHash is the SHA-256 digest of the v0.7.2 PowerShell fetcher.
-    # ExpectedFetcherHash 是 v0.7.2 PowerShell 拉取脚本的 SHA-256 摘要。
-    $ExpectedFetcherHash = "089bd33fe6ebfb949651e6bd6f782350eef1b31c9ae9e229c1e992b82ab5f2c6"
-    if ($ReleaseTag -ne $VerifiedReleaseTag) {
-        throw "Managed Node.js fetcher checksum is not registered for $ReleaseTag. Update the pinned checksum or use -SkipManagedNodeSetup."
-    }
-
     # RuntimeRoot is the compatible LuaSkills data root used by the debug binary.
     # RuntimeRoot 是调试二进制使用的兼容 LuaSkills 数据根。
     $RuntimeRoot = Join-Path $DebugRoot "runtime"
@@ -322,27 +305,12 @@ function Install-ManagedNodeRuntime {
         return
     }
 
-    # FetcherDirectory is the package-compatible location expected by the official script.
-    # FetcherDirectory 是官方脚本期望的包兼容位置。
-    $FetcherDirectory = Join-Path $DebugRoot "scripts\deps"
-    New-Item -ItemType Directory -Force -Path $FetcherDirectory | Out-Null
-    # FetcherPath is the verified script executed only after digest validation.
-    # FetcherPath 是仅在摘要校验后执行的脚本路径。
-    $FetcherPath = Join-Path $FetcherDirectory "fetch_managed_runtimes.ps1"
-    # FetcherDownloadPath isolates incomplete downloads from executable script paths.
-    # FetcherDownloadPath 将未完成下载与可执行脚本路径隔离。
-    $FetcherDownloadPath = "$FetcherPath.download"
-    # FetcherUrl is the immutable tag-bound official source URL.
-    # FetcherUrl 是绑定不可变标签的官方源码地址。
-    $FetcherUrl = "https://raw.githubusercontent.com/LuaSkills/luaskills/$ReleaseTag/scripts/deps/fetch_managed_runtimes.ps1"
-    Invoke-WebRequest -UseBasicParsing -Uri $FetcherUrl -OutFile $FetcherDownloadPath
-    # ActualFetcherHash verifies the exact downloaded script bytes before execution.
-    # ActualFetcherHash 在执行前校验下载脚本的精确字节。
-    $ActualFetcherHash = Get-Sha256Hash -Path $FetcherDownloadPath
-    if ($ActualFetcherHash -ne $ExpectedFetcherHash) {
-        throw "SHA-256 mismatch for managed runtime fetcher. Expected $ExpectedFetcherHash, got $ActualFetcherHash."
+    # FetcherPath ships inside the debug archive, so the archive checksum already covers its bytes.
+    # FetcherPath 随调试压缩包分发，因此压缩包校验和已覆盖其字节。
+    $FetcherPath = Join-Path $DebugRoot "scripts\deps\fetch_managed_runtimes.ps1"
+    if (-not (Test-Path -LiteralPath $FetcherPath -PathType Leaf)) {
+        throw "The debug package does not contain scripts\deps\fetch_managed_runtimes.ps1. Use luaskills-debug v0.8.0 or later."
     }
-    Move-Item -Force -LiteralPath $FetcherDownloadPath -Destination $FetcherPath
 
     & powershell -NoProfile -ExecutionPolicy Bypass -File $FetcherPath -Target node -RuntimeRoot $RuntimeRoot -NodeVersion $NodeVersion -PnpmVersion $PnpmVersion
     if ($LASTEXITCODE -ne 0) {
@@ -359,8 +327,8 @@ $ProjectRoot = Get-ProjectRoot
 # DebugRoot is the Git-ignored standalone LuaSkills debug workspace.
 # DebugRoot 是被 Git 忽略的独立 LuaSkills 调试工作区。
 $DebugRoot = [System.IO.Path]::GetFullPath((Join-Path $ProjectRoot ".luaskills-debug"))
-# ReleaseTag is the verified LuaSkills release used by this workspace.
-# ReleaseTag 是当前工作区使用的已校验 LuaSkills 发布版本。
+# ReleaseTag is the verified luaskills-debug release used by this workspace.
+# ReleaseTag 是当前工作区使用的已校验 luaskills-debug 发布版本。
 $ReleaseTag = Resolve-ReleaseTag -ProjectRoot $ProjectRoot -Override $Version
 # PlatformKey selects the exact official GitHub release asset.
 # PlatformKey 用于选择精确的官方 GitHub Release 资产。
@@ -368,9 +336,12 @@ $PlatformKey = Get-WindowsPlatformKey
 # AssetName is the official standalone debug tool archive name.
 # AssetName 是官方独立调试器压缩包名称。
 $AssetName = "luaskills-debug-tool-$PlatformKey.tar.gz"
-# ReleaseBaseUrl is the immutable GitHub release download directory.
-# ReleaseBaseUrl 是不可变的 GitHub Release 下载目录。
-$ReleaseBaseUrl = "https://github.com/LuaSkills/luaskills/releases/download/$ReleaseTag"
+# ReleaseBaseUrl is the immutable GitHub release download directory of the standalone debug tool.
+# ReleaseBaseUrl 是独立调试工具不可变的 GitHub Release 下载目录。
+$ReleaseBaseUrl = "https://github.com/LuaSkills/luaskills-debug/releases/download/$ReleaseTag"
+# ChecksumsName is the checksums file that lists every archive of the release.
+# ChecksumsName 是列出该 Release 每个压缩包的校验和文件。
+$ChecksumsName = "luaskills-debug-checksums.txt"
 
 # ExistingMatch indicates whether download and extraction can be reused.
 # ExistingMatch 表示是否可以复用已有下载与解压结果。
@@ -382,17 +353,23 @@ if ($Force -or -not $ExistingMatch) {
     # ArchivePath stores the downloaded official debug archive inside the ignored workspace.
     # ArchivePath 将下载的官方调试压缩包保存在被忽略的工作区内。
     $ArchivePath = Join-Path $DebugRoot $AssetName
-    # ChecksumPath stores the official checksum sidecar next to the archive.
-    # ChecksumPath 将官方校验文件保存在压缩包旁。
-    $ChecksumPath = "$ArchivePath.sha256"
+    # ChecksumPath stores the release checksums file next to the archive.
+    # ChecksumPath 将 Release 校验和文件保存在压缩包旁。
+    $ChecksumPath = Join-Path $DebugRoot $ChecksumsName
     Invoke-WebRequest -UseBasicParsing -Uri "$ReleaseBaseUrl/$AssetName" -OutFile $ArchivePath
-    Invoke-WebRequest -UseBasicParsing -Uri "$ReleaseBaseUrl/$AssetName.sha256" -OutFile $ChecksumPath
+    Invoke-WebRequest -UseBasicParsing -Uri "$ReleaseBaseUrl/$ChecksumsName" -OutFile $ChecksumPath
 
-    # ExpectedHash is the SHA-256 value published by the official release.
-    # ExpectedHash 是官方 Release 发布的 SHA-256 值。
-    $ExpectedHash = ((Get-Content -Raw -Encoding UTF8 -LiteralPath $ChecksumPath).Trim() -split '\s+')[0].ToLowerInvariant()
+    # ExpectedHash is the SHA-256 value the release lists for this archive.
+    # ExpectedHash 是 Release 为该压缩包列出的 SHA-256 值。
+    $ExpectedHash = ""
+    foreach ($Line in Get-Content -Encoding UTF8 -LiteralPath $ChecksumPath) {
+        $Fields = $Line.Trim() -split '\s+'
+        if ($Fields.Count -ge 2 -and $Fields[1].TrimStart('*') -eq $AssetName) {
+            $ExpectedHash = $Fields[0].ToLowerInvariant()
+        }
+    }
     if ($ExpectedHash -notmatch '^[0-9a-f]{64}$') {
-        throw "Invalid checksum file downloaded from $ReleaseBaseUrl/$AssetName.sha256"
+        throw "$ChecksumsName from $ReleaseBaseUrl does not list $AssetName"
     }
     # ActualHash is calculated from the downloaded archive before extraction.
     # ActualHash 是解压前根据下载压缩包计算出的哈希值。
@@ -433,5 +410,5 @@ if (-not $SkipRuntimeSetup) {
 }
 
 if (-not $SkipManagedNodeSetup) {
-    Install-ManagedNodeRuntime -DebugRoot $DebugRoot -ReleaseTag $ReleaseTag
+    Install-ManagedNodeRuntime -DebugRoot $DebugRoot
 }

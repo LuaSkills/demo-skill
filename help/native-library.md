@@ -6,7 +6,8 @@ How the payload gets into the package:
 
 - `native/demo_native.c` is the library source.
 - `scripts/build_native.py` compiles it for the current host into `native/<platform>/<library>`.
-- The release workflow builds all five declared platforms on native runners and packages them with `--require-bundled`, which fails when any declared payload is missing.
+- The release workflow builds all five declared platforms on native runners before it validates and packages. `luaskills-debug validate` and `package` always fail when a declared payload is missing or outside the package entries.
+- With the `standard` layout one zip carries all five libraries. With the `platform` layout each system's package carries only its own library, and LuaSkills 0.8.0 and later install the package for the current system.
 - No `sha256` is pinned in `dependencies.yaml`: the payload travels inside the skill zip, and the release checksum already covers every byte of that zip.
 
 How LuaSkills installs it:

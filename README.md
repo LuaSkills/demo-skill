@@ -4,10 +4,10 @@
 
 This repository is a complete, fork-ready LuaSkill template. It includes formal skill examples, an AI development skill, verified installation of the official `luaskills-debug` environment, real engine invocation, local validation and packaging, a bundled native library built per platform, and GitHub Actions release workflows.
 
-The template targets the stable LuaSkills release **v0.7.2**. [`.luaskills-version`](.luaskills-version) is the single debugger and documentation version baseline. The skill package version lives in `skill.yaml`; these versions have different purposes and do not need to match.
+The template targets the stable LuaSkills release **v0.8.0**. [`.luaskills-version`](.luaskills-version) holds the matching [`luaskills-debug`](https://github.com/LuaSkills/luaskills-debug) release tag and is the single debugger and documentation version baseline. luaskills-debug is a standalone repository; its major and minor version follow the LuaSkills runtime it embeds. The skill package version lives in `skill.yaml`; these versions have different purposes and do not need to match.
 
 <!-- >>> demo-only -->
-The demo skill version is `0.3.1`. Run the [template cleaner](#start-from-a-minimal-template) to strip the demos and keep only a minimal `hello` tool.
+The demo skill version is `0.4.0`. Run the [template cleaner](#start-from-a-minimal-template) to strip the demos and keep only a minimal `hello` tool.
 <!-- <<< demo-only -->
 
 ## Give the Fork to an AI
@@ -37,14 +37,14 @@ Linux/macOS:
 bash ./scripts/setup_debug.sh
 ```
 
-The setup script selects the official Release assets for the current operating system and CPU architecture:
+The setup script downloads two assets from `https://github.com/LuaSkills/luaskills-debug/releases/download/<tag>/`, where `<tag>` comes from `.luaskills-version` and `{platform}` is `windows-x64`, `linux-x64`, `linux-arm64`, `macos-x64`, or `macos-arm64`:
 
 ```text
 luaskills-debug-tool-{platform}.tar.gz
-luaskills-debug-tool-{platform}.tar.gz.sha256
+luaskills-debug-checksums.txt
 ```
 
-After checksum verification, the debugger, Lua runtime packages, Node.js `24.18.0`, and pnpm `11.11.0` are stored under:
+The checksums file lists every archive of the release. After the archive's SHA-256 matches its entry, the debugger, Lua runtime packages, Node.js `24.18.0`, and pnpm `11.11.0` are stored under:
 
 ```text
 .luaskills-debug/
@@ -60,7 +60,7 @@ The entire directory is ignored by Git and cannot enter a commit or formal skill
 bash ./scripts/setup_debug.sh --force
 ```
 
-Setup also downloads the official v0.7.2 `fetch_managed_runtimes.*` script, verifies its pinned SHA-256 digest, and only then executes it. The upstream fetcher verifies Node.js through the official `SHASUMS256.txt` and pnpm through npm integrity metadata. To inspect only the debugger without either runtime family, use:
+Node.js and pnpm are installed by `scripts/deps/fetch_managed_runtimes.*`, which ships inside the verified archive, so the archive checksum already covers it. The fetcher verifies Node.js through the official `SHASUMS256.txt` and pnpm through npm integrity metadata. To inspect only the debugger without either runtime family, use:
 
 ```powershell
 .\scripts\setup_debug.ps1 -SkipRuntimeSetup -SkipManagedNodeSetup
@@ -70,7 +70,7 @@ Setup also downloads the official v0.7.2 `fetch_managed_runtimes.*` script, veri
 bash ./scripts/setup_debug.sh --skip-runtime-setup --skip-managed-node-setup
 ```
 
-The v0.7.2 Linux debug tool archive also carries a detached OpenPGP signature at `bin/luaskills-debug.asc`. Setup verifies the SHA-256 checksum only. To check the signature as well, import the LuaSkills release key (`scripts/release/release-gpg-public.asc` in the LuaSkills repository at the same tag) and run:
+The Linux debug tool archive also carries a detached OpenPGP signature at `bin/luaskills-debug.asc`. Setup verifies the SHA-256 checksum only. To check the signature as well, import the release key (`scripts/release/release-gpg-public.asc` in the `LuaSkills/luaskills-debug` repository at the same tag) and run:
 
 ```bash
 gpg --verify .luaskills-debug/bin/luaskills-debug.asc .luaskills-debug/bin/luaskills-debug
@@ -78,9 +78,9 @@ gpg --verify .luaskills-debug/bin/luaskills-debug.asc .luaskills-debug/bin/luask
 
 ## Debug the Current Skill
 
-The wrapper uses the same loading and invocation path as the formal host. It stages only release-whitelisted source under `.luaskills-debug/source/<skill-id>/`, then synchronizes that source into the isolated runtime root. `.git/`, downloaded tools, AI prompts, tests, and build scripts are never recursively copied into the runtime. The wrapper calls `.luaskills-debug/bin/luaskills-debug` directly, because the launchers inside the v0.7.2 debug package forward only the classic options.
+The wrapper uses the same loading and invocation path as the formal host. It passes the repository root to the debugger as `--skill-path`, and luaskills-debug copies the skill into the isolated runtime root under `.luaskills-debug/runtime/`. The copy skips `target`, `.git`, `.svn`, `node_modules`, `__pycache__`, and `.luaskills-debug` at every depth, and `dist`, `out`, `temp`, `state`, `databases`, `dependencies`, `lua_packages`, and `libs` only directly under the repository root. The wrapper calls `.luaskills-debug/bin/luaskills-debug` directly, so every subcommand and option is reachable.
 
-Each debug command serializes environment setup, whitelist staging, synchronization, and invocation with a repository-level lock. Multiple AI tasks or terminals can start commands concurrently without deleting each other's staged files.
+Each debug command serializes environment setup, synchronization, and invocation with a repository-level lock. Multiple AI tasks or terminals can start commands concurrently without interfering with each other.
 
 Windows:
 
@@ -88,6 +88,8 @@ Windows:
 .\scripts\debug_skill.ps1 -Command inspect
 .\scripts\debug_skill.ps1 -Command list-tools
 .\scripts\debug_skill.ps1 -Command call -Tool hello -ArgsFile .\examples\debug\hello.args.json -Output json
+.\scripts\debug_skill.ps1 -Command validate
+.\scripts\debug_skill.ps1 -Command package
 ```
 
 Linux/macOS:
@@ -96,6 +98,8 @@ Linux/macOS:
 bash ./scripts/debug_skill.sh inspect
 bash ./scripts/debug_skill.sh list-tools
 bash ./scripts/debug_skill.sh call --tool hello --args-file ./examples/debug/hello.args.json --output json
+bash ./scripts/debug_skill.sh validate
+bash ./scripts/debug_skill.sh package
 ```
 
 <!-- >>> demo-only -->
@@ -120,17 +124,19 @@ bash ./scripts/debug_skill.sh call --tool native-demo --args-file ./examples/deb
 
 Available commands:
 
-- `sync`: synchronize the staged skill into the debug runtime.
+- `sync`: copy the skill into the debug runtime.
 - `inspect`: validate and display the manifest, skill ID, entries, and engine loading result.
 - `list-tools`: list real callable local and canonical tool names.
 - `call`: invoke a tool through the formal engine.
-- `probe-mirrors`: measure GitHub download mirrors; it needs no staged skill.
+- `validate`: check the skill against the LuaSkills packaging rules, including every bundled payload declared in `dependencies.yaml`.
+- `package`: validate, then write the release assets to `dist/` (`-OutDir` on Windows selects another directory). See [Release Packages](#release-packages).
+- `probe-mirrors`: measure GitHub download mirrors; it needs no skill.
 
 ## Download Mirrors and GitHub Tokens
 
 Dependencies declared with `source.type: github_release` are downloaded by the debugger while it prepares the skill. Two options control those downloads for `sync`, `inspect`, `list-tools`, and `call`:
 
-- `--github-mirror <id|url>` (`-GithubMirror` on Windows) downloads release assets through a built-in mirror id or a mirror URL. Built-in ids in v0.7.2: `github`, `gh-proxy-com`, `ghfast-top`, `gh-llkk-cc`, `ghproxy-net`.
+- `--github-mirror <id|url>` (`-GithubMirror` on Windows) downloads release assets through a built-in mirror id or a mirror URL. Built-in ids in v0.8.0: `github`, `gh-proxy-com`, `ghfast-top`, `gh-llkk-cc`, `ghproxy-net`.
 - `--github-token-env <NAME>` (`-GithubTokenEnv` on Windows) reads a GitHub token from the named environment variable. The token is sent only to `api.github.com`, which lifts the anonymous API rate limit. Pass the variable name, never the token itself.
 
 These options do not change how `setup_debug` downloads the debugger, which always uses the official release URLs.
@@ -181,12 +187,14 @@ python .\scripts\build_native.py
 python3 ./scripts/build_native.py
 ```
 
-Built libraries match the `*.dll`, `*.so`, and `*.dylib` rules in `.gitignore`, so they never enter a commit, yet the `native/` directory is part of the package whitelist, so they do enter the skill zip.
+Built libraries match the `*.dll`, `*.so`, and `*.dylib` rules in `.gitignore`, so they never enter a commit, yet `native/` is a package entry, so they do enter the skill zip.
 
 The dependency declares `required: false`. Since LuaSkills 0.7.2, an optional dependency that cannot be made ready (the payload is missing, the current platform has no package entry, or a download fails) only logs a warning and the skill still loads. So:
 
-- The release workflow builds all five platforms on native runners and packages with `--require-bundled`, so every published zip carries every payload.
+- `validate` and `package` always fail when a bundled payload declared in `dependencies.yaml` is missing or outside the package entries. The release workflow builds all five platforms on native runners before it validates and packages, so every published package carries its payloads. A local machine builds only its own library, so `verify_skill` skips `validate` and `package` here.
 - A host on `windows-arm64`, which has no entry, or a debug machine that has not run `build_native.py` still loads every other tool, and `native-demo` reports `exists: false`, just like `rg-check` reports a missing `rg`.
+
+With the `standard` layout this demo ships all five libraries in one zip. With the `platform` layout each system's package carries only its own library, about a fifth of the native payload.
 
 LuaSkills reuses an installed dependency of the same version. After changing the C source, bump the dependency version in `dependencies.yaml` and `runtime/native_demo.lua`, or delete `.luaskills-debug/runtime/dependencies/ffi/<skill-id>/demo-native/` before the next debug run.
 <!-- <<< demo-only -->
@@ -194,13 +202,13 @@ LuaSkills reuses an installed dependency of the same version. After changing the
 <!-- >>> demo-only -->
 ## LuaSkills Package Configuration Example
 
-The top-level `config` block in `skill.yaml` demonstrates package-scoped declarations for all five supported types: `string`, `integer`, `float`, `enum`, and `boolean`. It also covers constraints, defaults, a required sensitive value, titles, groups, ordering, formats, restart hints, advanced flags, and enum metadata. The contract was introduced in LuaSkills 0.5.5 and is unchanged in v0.7.2.
+The top-level `config` block in `skill.yaml` demonstrates package-scoped declarations for all five supported types: `string`, `integer`, `float`, `enum`, and `boolean`. It also covers constraints, defaults, a required sensitive value, titles, groups, ordering, formats, restart hints, advanced flags, and enum metadata. The contract was introduced in LuaSkills 0.5.5 and is unchanged in v0.8.0.
 
 `runtime/config_validator.lua` demonstrates isolated cross-field validation. `resources/skill-config.example.json` shows the only supported persisted document shape with `format_version`, a decimal-string `revision`, and the package-keyed `skills` object. The required sensitive `api_token` is intentionally absent from the tracked example.
 
 The embedding host must explicitly provide one absolute, writable, user-level `skill_config_root`. Normal package values are stored at `<skill_config_root>/skills/config.json`; package Lua can access only its own namespace through `vulcan.config.*`, while cross-package administration belongs to the host.
 
-The v0.7.2 standalone `luaskills-debug` CLI validates configuration declarations and the `config_validator` path during `inspect`, but it does not expose a `skill_config_root` option. The validator itself runs only during configuration transactions. Therefore the repository debug flow validates the package contract without pretending to perform configuration writes. Use a host or SDK configured with `skill_config_root` to exercise `runtime-config` reads, writes, and cross-field validation.
+The luaskills-debug v0.8.0 CLI validates configuration declarations and the `config_validator` path during `inspect`, but it does not expose a `skill_config_root` option. The validator itself runs only during configuration transactions. Therefore the repository debug flow validates the package contract without pretending to perform configuration writes. Use a host or SDK configured with `skill_config_root` to exercise `runtime-config` reads, writes, and cross-field validation.
 <!-- <<< demo-only -->
 
 ## One-Command Verification and Packaging
@@ -219,25 +227,42 @@ bash ./scripts/verify_skill.sh
 
 The command executes:
 
-1. Negative tests for package filtering, path traversal, symbolic links, release-version validation, bundled-payload packaging, and the template cleaner.
-2. Strict repository and manifest validation, including that every `examples/debug/<tool>.args.json` names a declared entry.
-3. Official debugger `inspect`, including the package configuration declaration and `config_validator` path when present.
-4. Official debugger `list-tools`.
-5. Real invocation of every example tool.
-6. Deterministic release-package generation.
+1. Python unit tests for release-version validation, the native build mapping, and the template cleaner. The cleaner test also runs `luaskills-debug validate` on the cleaned copy when the debugger is installed.
+2. Official debugger `inspect`, including the package configuration declaration and `config_validator` path when present.
+3. Official debugger `list-tools`.
+4. Real invocation of every example tool.
+5. `validate`, which applies the LuaSkills packaging rules.
+6. `package`, which writes the release assets to `dist/`.
 
 <!-- >>> demo-only -->
-In this demo the verify scripts first build the host `demo-native` library, which needs a C compiler, and then call all six tools. `node-runtime-demo` creates the locked pnpm environment and performs two ESM Worker calls.
+In this demo the verify scripts first build the host `demo-native` library, which needs a C compiler, and then call all six tools. `node-runtime-demo` creates the locked pnpm environment and performs two ESM Worker calls. Steps 5 and 6 are skipped locally because only the host library is built; the release workflow validates and packages after all five native builds. After the template cleaner runs, verify performs both steps locally.
 <!-- <<< demo-only -->
 
-Generated artifacts are stored under `dist/`:
+## Release Packages
+
+Packaging rules come from the LuaSkills runtime itself (`luaskills::package`), so local packages, the release action, and LuaSkills installers apply the same rules. `package` supports two layouts.
+
+**standard** (default) fits most skills, which ship no native libraries:
 
 ```text
 <skill-id>-v<version>-skill.zip
 <skill-id>-v<version>-checksums.txt
 ```
 
-The zip has one `<skill-id>/` top-level directory and collects only existing files from this whitelist:
+**platform** fits skills with large native libraries for several systems:
+
+```text
+<skill-id>-v<version>-<platform>-skill.zip
+<skill-id>-v<version>-skill.zip
+<skill-id>-v<version>-packages.json
+<skill-id>-v<version>-checksums.txt
+```
+
+Each system with bundled payloads gets its own `<platform>` package that carries only that system's libraries. The all-systems `<skill-id>-v<version>-skill.zip` serves systems without their own package and hosts older than 0.8.0; omit it with the action input `include-universal: false` or the CLI option `--no-universal`. LuaSkills 0.8.0 and later read the package index and install the package for the current system. LuaSkills Hub accepts at most 100 MiB per package, 600 MiB per version, and 1 GiB expanded.
+
+Locally, `debug_skill package` uses the `LUASKILLS_PACKAGE_LAYOUT` environment variable when set, otherwise `standard`. Preview the platform layout with `.\scripts\debug_skill.ps1 -Command package -Layout platform` or `bash ./scripts/debug_skill.sh package --layout platform`. To release with it, set the GitHub repository variable `LUASKILLS_PACKAGE_LAYOUT` to `platform` (Settings → Secrets and variables → Actions → Variables); the release workflow reads `${{ vars.LUASKILLS_PACKAGE_LAYOUT || 'standard' }}`.
+
+Every zip has one `<skill-id>/` top-level directory and collects only these top-level entries when present:
 
 ```text
 skill.yaml
@@ -245,6 +270,8 @@ dependencies.yaml
 README.md
 README.zh-CN.md
 LICENSE
+THIRD_PARTY_NOTICES.md
+THIRD_PARTY_LICENSES.md
 runtime/
 node/
 python/
@@ -253,21 +280,24 @@ help/
 overflow_templates/
 resources/
 licenses/
+schemas/
 ```
 
-`.agents/`, `.github/`, `scripts/`, `tests/`, `.luaskills-debug/`, `dist/`, `node_modules/`, `.pnpm-store/`, Python caches, other local artifacts, and symbolic links cannot enter the formal package.
+`--include <name>` (the action input `include`) adds another top-level file or directory. Symbolic links and generated folders such as `node_modules/`, `.pnpm-store/`, and `__pycache__/` never enter a package, and neither do `.agents/`, `.github/`, `scripts/`, `tests/`, `examples/`, `.luaskills-debug/`, or `dist/`.
 
-Local packaging accepts missing bundled payloads so that one machine can package what it has built. `python scripts/package_skill.py --require-bundled` fails instead when any `path` declared by a bundled dependency in `dependencies.yaml` would be absent from the zip; the release workflow always uses it.
+`validate` and `package` always fail when a bundled payload declared in `dependencies.yaml` is missing or outside the package entries.
 
 ## GitHub Actions
 
 The repository contains two reusable workflows:
 
-- **Validate and Package LuaSkill**: on pull requests or manual dispatch, downloads the debugger and runtimes, loads the skill, enumerates tools, performs real invocations, packages the skill, and uploads `<repository-name>-verified-package`.
-- **Release LuaSkill**: on a `v*` tag, reruns the same real debug flow, packages with `--require-bundled`, creates a GitHub Release, and uploads only the formal zip and checksum.
+- **Validate and Package LuaSkill**: on pull requests or manual dispatch, runs `verify_skill.sh`, which downloads the debugger and runtimes, loads the skill, enumerates tools, performs real invocations, validates, and packages, then uploads `dist/*` as `<repository-name>-verified-package` when it exists.
+- **Release LuaSkill**: on a `v*` tag, runs the `LuaSkills/luaskills-debug@v0.8.0` action with the selected `layout` and `expect-tag: ${{ github.ref_name }}`. The action validates the skill, fails when the tag differs from `skill.yaml.version` or a bundled payload is missing, and writes the release assets with the checksums file. `gh release create` then uploads every asset. The release job does not rerun the debug flow; the release script runs it before pushing the tag.
+
+LuaSkills Hub imports skills only from GitHub Releases. A skill is bound to the first GitHub repository it is published from.
 
 <!-- >>> demo-only -->
-Both workflows build the host `demo-native` library before verification. The release workflow also runs a `native` matrix job that builds the library on `ubuntu-24.04` (linux-x64), `ubuntu-24.04-arm` (linux-arm64), `macos-15-intel` (macos-x64), `macos-15` (macos-arm64), and `windows-latest` with MSVC (windows-x64), the same runner labels the LuaSkills core release uses. The release job downloads each library into `native/<platform>/` before packaging.
+The validate workflow builds the host `demo-native` library through `verify_skill.sh`. The release workflow runs a `native` matrix job that builds the library on `ubuntu-24.04` (linux-x64), `ubuntu-24.04-arm` (linux-arm64), `macos-15-intel` (macos-x64), `macos-15` (macos-arm64), and `windows-latest` with MSVC (windows-x64), the same runner labels the LuaSkills core release uses. The release job downloads each library into `native/<platform>/` before the action validates and packages.
 <!-- <<< demo-only -->
 
 The release script rejects a dirty worktree, requires its argument to match `skill.yaml.version`, and reruns the complete verification flow before it creates and pushes the tag. Pass the exact version from `skill.yaml`:
@@ -281,7 +311,7 @@ bash ./scripts/tag_release.sh <version>
 ```
 
 <!-- >>> demo-only -->
-For this demo the version is `0.3.1`.
+For this demo the version is `0.4.0`.
 <!-- <<< demo-only -->
 
 ## Start From a Minimal Template
@@ -301,9 +331,9 @@ The cleaner:
 - removes the `demo-status`, `rg-check`, `overflow-demo`, `node-runtime-demo`, and `native-demo` tools with their runtime, help, and example files, the configuration example, and the `node/`, `native/`, `overflow_templates/`, and `resources/` directories;
 - rewrites `skill.yaml`, `dependencies.yaml` (all groups empty), `help/help.md`, and `licenses/THIRD_PARTY_NOTICES.md` with minimal content;
 - deletes every block marked `demo-only` in both README files, the verify scripts, and the workflows, so the verify scripts call only `hello` and the release workflow loses its native build job;
-- keeps all tooling: the package, validate, debug, setup, release, tag, native build, and cleaner scripts, the workflows, `.agents/`, and `tests/`.
+- keeps all tooling: the debug, setup, verify, release-version, tag, native build, and cleaner scripts, the workflows, `.agents/`, and `tests/`.
 
-Without `--yes` it only lists the planned changes. It refuses to run while `git status --porcelain` reports changes unless `--force` is passed, prints every removed or rewritten path, and does nothing when run again. Afterwards run `validate_skill.py` and `verify_skill`, and pass `--skip-managed-node-setup` to `setup_debug` if the skill does not declare `node_runtime`.
+Without `--yes` it only lists the planned changes. It refuses to run while `git status --porcelain` reports changes unless `--force` is passed, prints every removed or rewritten path, and does nothing when run again. Afterwards run `verify_skill`, and pass `--skip-managed-node-setup` to `setup_debug` if the skill does not declare `node_runtime`.
 
 ## What to Replace After Forking
 
@@ -311,9 +341,10 @@ Without `--yes` it only lists the planned changes. It refuses to run while `git 
 2. Rename the repository to the final `skill_id`, using lowercase letters, digits, and single hyphens.
 3. Replace the display name, version, entries, parameters, and help references in `skill.yaml`.
 4. Replace example content under `runtime/`, `node/`, `python/`, `native/`, `help/`, `overflow_templates/`, `resources/`, and `licenses/`.
-5. Declare real dependencies in `dependencies.yaml`. The validator does not require the example `rg` or `demo-native` dependencies. If Node.js is not needed, remove `node_runtime`, `node/`, and its entry together. If no native library is bundled, remove `native/` and the bundled entry together.
-6. Replace remaining `demo-skill` descriptions in both README files and help documents.
-7. Run `verify_skill`, complete five consecutive clean review passes, commit the intended files, and only then run the release script.
+5. Declare real dependencies in `dependencies.yaml`. Nothing requires the example `rg` or `demo-native` dependencies. If Node.js is not needed, remove `node_runtime`, `node/`, and its entry together. If no native library is bundled, remove `native/` and the bundled entry together.
+6. Choose the [release layout](#release-packages): keep `standard` unless the skill ships large native libraries for several systems, then set the repository variable `LUASKILLS_PACKAGE_LAYOUT` to `platform`.
+7. Replace remaining `demo-skill` descriptions in both README files and help documents.
+8. Run `verify_skill`, complete five consecutive clean review passes, commit the intended files, and only then run the release script.
 
 The physical repository directory name defines the formal `skill_id`. Changing only `skill.yaml.name` does not change the installation identity.
 
@@ -331,11 +362,12 @@ The physical repository directory name defines the formal `skill_id`. Changing o
 
 ## Five-Pass Pre-Release Review
 
-After implementation and the real flow test pass, the AI must repeatedly review code, manifests, download verification, cross-platform scripts, package whitelists, Actions, and documentation. Any finding must be fixed immediately, followed by a full retest and a reset of the consecutive-pass counter. Work may finish or release only after five consecutive complete reviews find no issues.
+After implementation and the real flow test pass, the AI must repeatedly review code, manifests, download verification, cross-platform scripts, package entries, Actions, and documentation. Any finding must be fixed immediately, followed by a full retest and a reset of the consecutive-pass counter. Work may finish or release only after five consecutive complete reviews find no issues.
 
-Use the official LuaSkills v0.7.2 documentation as the protocol authority:
+Use the official LuaSkills v0.8.0 documentation as the protocol authority:
 
-- [Lua Skill Development Manual](https://github.com/LuaSkills/luaskills/blob/v0.7.2/docs/development/skill-development.md)
-- [Lua Skill Development Manual (Simplified Chinese)](https://github.com/LuaSkills/luaskills/blob/v0.7.2/docs/zh-CN/development/skill-development.md)
-- [Package Configuration Host Contract](https://github.com/LuaSkills/luaskills/blob/v0.7.2/docs/integration/package-configuration.md)
-- [LuaSkills v0.7.2 Release](https://github.com/LuaSkills/luaskills/releases/tag/v0.7.2)
+- [Lua Skill Development Manual](https://github.com/LuaSkills/luaskills/blob/v0.8.0/docs/development/skill-development.md)
+- [Lua Skill Development Manual (Simplified Chinese)](https://github.com/LuaSkills/luaskills/blob/v0.8.0/docs/zh-CN/development/skill-development.md)
+- [Package Configuration Host Contract](https://github.com/LuaSkills/luaskills/blob/v0.8.0/docs/integration/package-configuration.md)
+- [LuaSkills v0.8.0 Release](https://github.com/LuaSkills/luaskills/releases/tag/v0.8.0)
+- [luaskills-debug](https://github.com/LuaSkills/luaskills-debug)

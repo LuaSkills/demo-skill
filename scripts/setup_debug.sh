@@ -7,8 +7,8 @@ resolve_project_root() {
   cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd
 }
 
-# Normalize and validate a LuaSkills semantic release tag.
-# 标准化并校验 LuaSkills 语义化发布标签。
+# Normalize and validate a luaskills-debug semantic release tag.
+# 标准化并校验 luaskills-debug 语义化发布标签。
 resolve_release_tag() {
   # RawVersion is the explicit override or repository-pinned version.
   # RawVersion 是显式覆盖值或仓库固定版本。
@@ -20,7 +20,7 @@ resolve_release_tag() {
     raw_version="v$raw_version"
   fi
   if [[ ! "$raw_version" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-+][0-9A-Za-z.-]+)?$ ]]; then
-    echo "Invalid LuaSkills release tag: $raw_version" >&2
+    echo "Invalid luaskills-debug release tag: $raw_version" >&2
     return 1
   fi
   printf '%s\n' "$raw_version"
@@ -46,7 +46,7 @@ resolve_platform_key() {
   case "$architecture" in
     x86_64|amd64) architecture="x64" ;;
     arm64|aarch64) architecture="arm64" ;;
-    *) echo "Unsupported architecture for the LuaSkills debug package: $architecture" >&2; return 1 ;;
+    *) echo "Unsupported architecture for the luaskills-debug package: $architecture" >&2; return 1 ;;
   esac
   printf '%s-%s\n' "$operating_system" "$architecture"
 }
@@ -125,8 +125,8 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-# ReleaseTag is the verified LuaSkills release used by this workspace.
-# ReleaseTag 是当前工作区使用的已校验 LuaSkills 发布版本。
+# ReleaseTag is the verified luaskills-debug release used by this workspace.
+# ReleaseTag 是当前工作区使用的已校验 luaskills-debug 发布版本。
 RELEASE_TAG="$(resolve_release_tag "$VERSION_OVERRIDE")"
 # PlatformKey selects the exact official GitHub release asset.
 # PlatformKey 用于选择精确的官方 GitHub Release 资产。
@@ -134,9 +134,12 @@ PLATFORM_KEY="$(resolve_platform_key)"
 # AssetName is the official standalone debug tool archive name.
 # AssetName 是官方独立调试器压缩包名称。
 ASSET_NAME="luaskills-debug-tool-$PLATFORM_KEY.tar.gz"
-# ReleaseBaseUrl is the immutable GitHub release download directory.
-# ReleaseBaseUrl 是不可变的 GitHub Release 下载目录。
-RELEASE_BASE_URL="https://github.com/LuaSkills/luaskills/releases/download/$RELEASE_TAG"
+# ReleaseBaseUrl is the immutable GitHub release download directory of the standalone debug tool.
+# ReleaseBaseUrl 是独立调试工具不可变的 GitHub Release 下载目录。
+RELEASE_BASE_URL="https://github.com/LuaSkills/luaskills-debug/releases/download/$RELEASE_TAG"
+# ChecksumsName is the checksums file that lists every archive of the release.
+# ChecksumsName 是列出该 Release 每个压缩包的校验和文件。
+CHECKSUMS_NAME="luaskills-debug-checksums.txt"
 # InstalledVersion records the currently extracted release tag when present.
 # InstalledVersion 记录当前已解压的发布标签（若存在）。
 INSTALLED_VERSION=""
@@ -151,17 +154,17 @@ if [ "$FORCE" = "true" ] || [ "$INSTALLED_VERSION" != "$RELEASE_TAG" ] || [ ! -x
   # ArchivePath stores the official archive inside the ignored workspace.
   # ArchivePath 将官方压缩包保存在被忽略的工作区内。
   ARCHIVE_PATH="$DEBUG_ROOT/$ASSET_NAME"
-  # ChecksumPath stores the official checksum sidecar next to the archive.
-  # ChecksumPath 将官方校验文件保存在压缩包旁。
-  CHECKSUM_PATH="$ARCHIVE_PATH.sha256"
+  # ChecksumPath stores the release checksums file next to the archive.
+  # ChecksumPath 将 Release 校验和文件保存在压缩包旁。
+  CHECKSUM_PATH="$DEBUG_ROOT/$CHECKSUMS_NAME"
   curl --fail --location --silent --show-error "$RELEASE_BASE_URL/$ASSET_NAME" --output "$ARCHIVE_PATH"
-  curl --fail --location --silent --show-error "$RELEASE_BASE_URL/$ASSET_NAME.sha256" --output "$CHECKSUM_PATH"
+  curl --fail --location --silent --show-error "$RELEASE_BASE_URL/$CHECKSUMS_NAME" --output "$CHECKSUM_PATH"
 
-  # ExpectedHash is the SHA-256 value published by the official release.
-  # ExpectedHash 是官方 Release 发布的 SHA-256 值。
-  EXPECTED_HASH="$(awk 'NR == 1 {print tolower($1)}' "$CHECKSUM_PATH")"
+  # ExpectedHash is the SHA-256 value the release lists for this archive.
+  # ExpectedHash 是 Release 为该压缩包列出的 SHA-256 值。
+  EXPECTED_HASH="$(awk -v name="$ASSET_NAME" '{ file = $2; sub(/^\*/, "", file); if (file == name) print tolower($1) }' "$CHECKSUM_PATH")"
   if [[ ! "$EXPECTED_HASH" =~ ^[0-9a-f]{64}$ ]]; then
-    echo "Invalid checksum file downloaded from $RELEASE_BASE_URL/$ASSET_NAME.sha256" >&2
+    echo "$CHECKSUMS_NAME from $RELEASE_BASE_URL does not list $ASSET_NAME" >&2
     exit 1
   fi
   # ActualHash is calculated from the downloaded archive before extraction.
@@ -203,17 +206,6 @@ if [ "$SKIP_MANAGED_NODE_SETUP" != "true" ]; then
   # PnpmVersion is the exact managed package-manager version declared by dependencies.yaml.
   # PnpmVersion 是 dependencies.yaml 声明的精确受管包管理器版本。
   PNPM_VERSION="11.11.0"
-  # VerifiedReleaseTag identifies the release whose fetcher digest is pinned below.
-  # VerifiedReleaseTag 标识下方固定拉取器摘要对应的发布版本。
-  VERIFIED_RELEASE_TAG="v0.7.2"
-  # ExpectedFetcherHash is the SHA-256 digest of the v0.7.2 shell fetcher.
-  # ExpectedFetcherHash 是 v0.7.2 Shell 拉取脚本的 SHA-256 摘要。
-  EXPECTED_FETCHER_HASH="0e703abdb9445dfcee782010f652ae20f738a87b886e26e01963d50fde59ceeb"
-  if [ "$RELEASE_TAG" != "$VERIFIED_RELEASE_TAG" ]; then
-    echo "Managed Node.js fetcher checksum is not registered for $RELEASE_TAG. Update the pinned checksum or use --skip-managed-node-setup." >&2
-    exit 1
-  fi
-
   # NodeManifest is the official installation marker for the pinned Node.js distribution.
   # NodeManifest 是固定 Node.js 发行版的官方安装标记。
   NODE_MANIFEST="$DEBUG_ROOT/runtime/dependencies/runtimes/node/node-$NODE_VERSION-$PLATFORM_KEY/runtime-manifest.json"
@@ -221,29 +213,13 @@ if [ "$SKIP_MANAGED_NODE_SETUP" != "true" ]; then
   # PnpmManifest 是固定 pnpm 发行版的官方安装标记。
   PNPM_MANIFEST="$DEBUG_ROOT/runtime/dependencies/runtimes/node/pnpm-$PNPM_VERSION/runtime-manifest.json"
   if [ ! -f "$NODE_MANIFEST" ] || [ ! -f "$PNPM_MANIFEST" ]; then
-    # FetcherDirectory is the package-compatible location expected by the official script.
-    # FetcherDirectory 是官方脚本期望的包兼容位置。
-    FETCHER_DIRECTORY="$DEBUG_ROOT/scripts/deps"
-    mkdir -p "$FETCHER_DIRECTORY"
-    # FetcherPath is the verified script executed only after digest validation.
-    # FetcherPath 是仅在摘要校验后执行的脚本路径。
-    FETCHER_PATH="$FETCHER_DIRECTORY/fetch_managed_runtimes.sh"
-    # FetcherDownloadPath isolates incomplete downloads from executable script paths.
-    # FetcherDownloadPath 将未完成下载与可执行脚本路径隔离。
-    FETCHER_DOWNLOAD_PATH="$FETCHER_PATH.download"
-    # FetcherUrl is the immutable tag-bound official source URL.
-    # FetcherUrl 是绑定不可变标签的官方源码地址。
-    FETCHER_URL="https://raw.githubusercontent.com/LuaSkills/luaskills/$RELEASE_TAG/scripts/deps/fetch_managed_runtimes.sh"
-    curl --fail --location --silent --show-error "$FETCHER_URL" --output "$FETCHER_DOWNLOAD_PATH"
-    # ActualFetcherHash verifies the exact downloaded script bytes before execution.
-    # ActualFetcherHash 在执行前校验下载脚本的精确字节。
-    ACTUAL_FETCHER_HASH="$(calculate_sha256 "$FETCHER_DOWNLOAD_PATH")"
-    if [ "$ACTUAL_FETCHER_HASH" != "$EXPECTED_FETCHER_HASH" ]; then
-      echo "SHA-256 mismatch for managed runtime fetcher. Expected $EXPECTED_FETCHER_HASH, got $ACTUAL_FETCHER_HASH." >&2
+    # FetcherPath ships inside the debug archive, so the archive checksum already covers its bytes.
+    # FetcherPath 随调试压缩包分发，因此压缩包校验和已覆盖其字节。
+    FETCHER_PATH="$DEBUG_ROOT/scripts/deps/fetch_managed_runtimes.sh"
+    if [ ! -f "$FETCHER_PATH" ]; then
+      echo "The debug package does not contain scripts/deps/fetch_managed_runtimes.sh. Use luaskills-debug v0.8.0 or later." >&2
       exit 1
     fi
-    mv -f -- "$FETCHER_DOWNLOAD_PATH" "$FETCHER_PATH"
-    chmod +x "$FETCHER_PATH"
     RUNTIME_ROOT="$DEBUG_ROOT/runtime" NODE_VERSION="$NODE_VERSION" PNPM_VERSION="$PNPM_VERSION" bash "$FETCHER_PATH" node
     if [ ! -f "$NODE_MANIFEST" ] || [ ! -f "$PNPM_MANIFEST" ]; then
       echo "Managed Node.js setup completed without the documented runtime manifests." >&2

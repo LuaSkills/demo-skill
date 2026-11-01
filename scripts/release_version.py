@@ -7,10 +7,48 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import re
 import sys
 
-from scripts.package_skill import load_manifest, manifest_version, repo_root
-from scripts.validate_skill import is_valid_semver
+import yaml
+
+
+# SemverPattern is the strict semantic-version grammar accepted for skill.yaml versions and release tags.
+# SemverPattern 是 skill.yaml 版本与发布标签接受的严格语义化版本语法。
+SEMVER_PATTERN = re.compile(
+    r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
+    r"(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?"
+    r"(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$"
+)
+
+
+"""
+Return the repository root that also acts as the skill root.
+返回同时作为技能根目录的仓库根目录。
+"""
+def repo_root() -> Path:
+    return Path(__file__).resolve().parent.parent
+
+
+"""
+Check whether one value is a strict semantic version.
+检查一个值是否为严格的语义化版本。
+"""
+def is_valid_semver(value: str) -> bool:
+    return bool(SEMVER_PATTERN.fullmatch(value.strip()))
+
+
+"""
+Return the version declared by skill.yaml under root.
+返回 root 下 skill.yaml 声明的版本。
+"""
+def manifest_version(root: Path) -> str:
+    with (root / "skill.yaml").open("r", encoding="utf-8") as handle:
+        manifest = yaml.safe_load(handle) or {}
+    version = manifest.get("version") if isinstance(manifest, dict) else None
+    if not isinstance(version, str) or not version.strip():
+        raise RuntimeError("skill.yaml must contain a non-empty version")
+    return version.strip()
 
 
 """
@@ -57,7 +95,7 @@ def resolve_release_tag(root: Path, requested_version: str) -> str:
     requested_value = normalize_requested_version(requested_version)
     # DeclaredVersion is the single release version source from skill.yaml.
     # DeclaredVersion 是来自 skill.yaml 的唯一发布版本来源。
-    declared_version = manifest_version(load_manifest(root))
+    declared_version = manifest_version(root)
     if not is_valid_semver(declared_version):
         raise RuntimeError(f"skill.yaml version is not a valid semantic version: {declared_version}")
     if requested_value != declared_version:

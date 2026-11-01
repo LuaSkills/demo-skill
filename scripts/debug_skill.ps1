@@ -1,12 +1,12 @@
 ﻿<#
 .SYNOPSIS
-Run the official LuaSkills debugger against the repository-root skill.
-使用官方 LuaSkills 调试器运行仓库根目录中的 skill。
+Run luaskills-debug against the repository-root skill: load, call, validate, or package it.
+使用 luaskills-debug 处理仓库根目录中的 skill：加载、调用、校验或打包。
 #>
 param(
     # Debug command forwarded to the official debugger.
     # 转发给官方调试器的调试命令。
-    [ValidateSet("sync", "inspect", "list-tools", "call", "probe-mirrors")]
+    [ValidateSet("sync", "inspect", "list-tools", "call", "validate", "package", "probe-mirrors")]
     [string]$Command = "inspect",
     # Tool name required by the call command.
     # call 命令需要的工具名称。
@@ -29,7 +29,20 @@ param(
     [string[]]$GithubMirror = @(),
     # Name of the environment variable that holds a GitHub token; never the token itself.
     # 保存 GitHub 令牌的环境变量名称；绝不是令牌本身。
-    [string]$GithubTokenEnv = ""
+    [string]$GithubTokenEnv = "",
+    # Release layout used by package: standard (default) or platform; LUASKILLS_PACKAGE_LAYOUT overrides the default.
+    # package 使用的发布布局：standard（默认）或 platform；LUASKILLS_PACKAGE_LAYOUT 可覆盖默认值。
+    [ValidateSet("", "standard", "platform")]
+    [string]$Layout = "",
+    # Directory that receives the release assets written by package.
+    # 接收 package 写出的发布资产的目录。
+    [string]$OutDir = "dist",
+    # Extra top-level entries that validate and package ship beside the default package entries.
+    # validate 与 package 在默认包条目之外额外发布的顶层条目。
+    [string[]]$Include = @(),
+    # Omit the all-systems package from a platform release.
+    # 在分平台发布中省略全系统包。
+    [switch]$NoUniversal
 )
 
 # ErrorActionPreference makes staging and debugger failures explicit and terminating.
@@ -105,10 +118,8 @@ $ProjectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 # DebugRoot is the ignored standalone debug workspace.
 # DebugRoot 是被忽略的独立调试工作区。
 $DebugRoot = Join-Path $ProjectRoot ".luaskills-debug"
-# BinaryPath is the official debugger executable. The v0.7.2 package launchers forward only the classic flags,
-# so the wrapper calls the executable directly to reach --github-mirror, --github-token-env, and probe-mirrors.
-# BinaryPath 是官方调试器可执行文件。v0.7.2 包内启动器只转发传统参数，
-# 因此封装脚本直接调用可执行文件，以支持 --github-mirror、--github-token-env 与 probe-mirrors。
+# BinaryPath is the luaskills-debug executable. The wrapper calls it directly so every subcommand and option is reachable.
+# BinaryPath 是 luaskills-debug 可执行文件。封装脚本直接调用它，使每个子命令与选项都可用。
 $BinaryPath = Join-Path $DebugRoot "bin\luaskills-debug.exe"
 # RuntimeRoot is the package-local runtime used by every official debugger command.
 # RuntimeRoot 是所有官方调试命令共同使用的包内 runtime。
@@ -118,11 +129,25 @@ if ($Command -eq "probe-mirrors") {
         throw "probe-mirrors accepts only -GithubMirror and -Output."
     }
 }
+elseif ($Command -in @("validate", "package")) {
+    if ($Tool -or $ArgsJson -or $ArgsFile -or $EnableHostResult -or $GithubTokenEnv -or $GithubMirror.Count -gt 0) {
+        throw "$Command accepts only -Layout, -OutDir, -Include, -NoUniversal and -Output."
+    }
+    if ($Output -eq "content") {
+        throw "$Command renders pretty or json output."
+    }
+}
+elseif ($Include.Count -gt 0 -or $NoUniversal) {
+    throw "-Include and -NoUniversal apply only to validate and package."
+}
 elseif ($GithubMirror.Count -gt 1) {
     throw "$Command accepts at most one -GithubMirror value; only probe-mirrors compares several mirrors."
 }
-# DebugMutex serializes setup, staging, synchronization, and invocation for this repository.
-# DebugMutex 串行化当前仓库的初始化、暂存、同步与调用。
+if ([string]::IsNullOrWhiteSpace($Layout)) {
+    $Layout = if ([string]::IsNullOrWhiteSpace($env:LUASKILLS_PACKAGE_LAYOUT)) { "standard" } else { $env:LUASKILLS_PACKAGE_LAYOUT }
+}
+# DebugMutex serializes setup, synchronization, and invocation for this repository.
+# DebugMutex 串行化当前仓库的初始化、同步与调用。
 $DebugMutex = Enter-RepositoryDebugMutex -ProjectRoot $ProjectRoot
 # ExitCode preserves the official debugger process result until after mutex release.
 # ExitCode 保留官方调试器进程结果，直到互斥锁释放后再退出。
@@ -144,17 +169,22 @@ try {
     # ForwardedArgs contains only options accepted by the selected debugger subcommand.
     # ForwardedArgs 只包含所选调试器子命令接受的选项。
     $ForwardedArgs = @($Command)
-    if ($Command -ne "probe-mirrors") {
-        # StageScript copies only formal release-package files into the ignored workspace.
-        # StageScript 仅把正式发布包文件复制到被忽略的工作区。
-        $StageScript = Join-Path $PSScriptRoot "stage_debug_skill.py"
-        # StagedSkillPath is the clean source directory synchronized by the official debugger.
-        # StagedSkillPath 是由官方调试器同步的干净源目录。
-        $StagedSkillPath = (& python $StageScript | Select-Object -Last 1).Trim()
-        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $StagedSkillPath -PathType Container)) {
-            throw "Failed to stage the current LuaSkill for debugging."
+    if ($Command -in @("validate", "package")) {
+        $ForwardedArgs += @("--skill-path", $ProjectRoot)
+        foreach ($Entry in $Include) {
+            $ForwardedArgs += @("--include", $Entry)
         }
-        $ForwardedArgs += @("--runtime-root", $RuntimeRoot, "--skill-path", $StagedSkillPath)
+    }
+    if ($Command -eq "package") {
+        $ForwardedArgs += @("--out-dir", $OutDir, "--layout", $Layout)
+        if ($NoUniversal) {
+            $ForwardedArgs += "--no-universal"
+        }
+    }
+    if ($Command -notin @("validate", "package", "probe-mirrors")) {
+        # The debugger copies the repository into the runtime root and skips build, checkout and packaging folders.
+        # 调试器把仓库复制到 runtime root，并跳过构建、检出与打包目录。
+        $ForwardedArgs += @("--runtime-root", $RuntimeRoot, "--skill-path", $ProjectRoot)
         if (-not [string]::IsNullOrWhiteSpace($Tool)) {
             $ForwardedArgs += @("--tool", $Tool)
         }

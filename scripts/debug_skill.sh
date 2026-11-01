@@ -7,8 +7,8 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # DebugRoot is the ignored standalone debug workspace.
 # DebugRoot 是被忽略的独立调试工作区。
 DEBUG_ROOT="$PROJECT_ROOT/.luaskills-debug"
-# LockFile serializes setup, staging, synchronization, and invocation.
-# LockFile 串行化初始化、暂存、同步与调用。
+# LockFile serializes setup, synchronization, and invocation.
+# LockFile 串行化初始化、同步与调用。
 LOCK_FILE="$PROJECT_ROOT/.luaskills-debug.lock"
 # OwnerFile is fully written before its hard link competes for the visible lock path.
 # OwnerFile 在其硬链接竞争可见锁路径前完成全部写入。
@@ -101,10 +101,8 @@ acquire_debug_lock
 # Setup 在每个调试命令前于仓库锁内幂等执行。
 bash "$PROJECT_ROOT/scripts/setup_debug.sh"
 
-# BinaryPath is the official debugger executable. The v0.7.2 package launcher forwards only the classic flags,
-# so the wrapper calls the executable directly and every option after the command passes through unchanged.
-# BinaryPath 是官方调试器可执行文件。v0.7.2 包内启动器只转发传统参数，
-# 因此封装脚本直接调用可执行文件，命令之后的所有选项原样透传。
+# BinaryPath is the luaskills-debug executable; every option after the command passes through unchanged.
+# BinaryPath 是 luaskills-debug 可执行文件；命令之后的所有选项原样透传。
 BINARY_PATH="$DEBUG_ROOT/bin/luaskills-debug"
 # RuntimeRoot is the package-local runtime used by every official debugger command.
 # RuntimeRoot 是所有官方调试命令共同使用的包内 runtime。
@@ -128,12 +126,19 @@ if [ "$COMMAND" = "probe-mirrors" ]; then
   exit $?
 fi
 
-# PythonCommand is the interpreter used to build a clean debugger source stage.
-# PythonCommand 是用于构建干净调试源暂存区的解释器。
-PYTHON_COMMAND="${PYTHON_COMMAND:-python3}"
-# StagedSkillPath contains only files included by the formal release-package whitelist.
-# StagedSkillPath 仅包含正式发布包白名单收集的文件。
-STAGED_SKILL_PATH="$("$PYTHON_COMMAND" "$PROJECT_ROOT/scripts/stage_debug_skill.py")"
+if [ "$COMMAND" = "validate" ]; then
+  "$BINARY_PATH" validate --skill-path "$PROJECT_ROOT" "$@"
+  exit $?
+fi
 
-"$BINARY_PATH" "$COMMAND" --runtime-root "$RUNTIME_ROOT" --skill-path "$STAGED_SKILL_PATH" "$@"
+if [ "$COMMAND" = "package" ]; then
+  # Layout is standard by default; the repository variable LUASKILLS_PACKAGE_LAYOUT or --layout selects platform.
+  # Layout 默认为 standard；仓库变量 LUASKILLS_PACKAGE_LAYOUT 或 --layout 可选择 platform。
+  "$BINARY_PATH" package --skill-path "$PROJECT_ROOT" --out-dir "$PROJECT_ROOT/dist" --layout "${LUASKILLS_PACKAGE_LAYOUT:-standard}" "$@"
+  exit $?
+fi
+
+# The debugger copies the repository into the runtime root and skips build, checkout and packaging folders.
+# 调试器把仓库复制到 runtime root，并跳过构建、检出与打包目录。
+"$BINARY_PATH" "$COMMAND" --runtime-root "$RUNTIME_ROOT" --skill-path "$PROJECT_ROOT" "$@"
 exit $?

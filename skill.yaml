@@ -1,5 +1,5 @@
 name: LuaSkills Demo Skill
-version: 0.3.1
+version: 0.4.0
 enable: true
 debug: false
 config_validator: runtime/config_validator.lua
@@ -60,16 +60,8 @@ config:
     title: Telemetry
     group: Diagnostics
     order: 40
-lancedb:
-  enable: false
-  log_level: warning
-  slow_log_enabled: false
-  slow_log_threshold_ms: 800
 sqlite:
   enable: false
-  log_level: warning
-  slow_log_enabled: false
-  slow_log_threshold_ms: 800
 help:
   main:
     description: Main help node for the LuaSkills/demo-skill repository used in update smoke tests.
